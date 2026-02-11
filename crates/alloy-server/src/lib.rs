@@ -127,10 +127,16 @@ async fn grpc_contracts_markdown() -> ([(header::HeaderName, &'static str); 1], 
     )
 }
 
-async fn grpc_contracts_openapi_bridge() -> Json<Value> {
-    let bridge = serde_json::from_str(grpc_contract_openapi_bridge_json())
-        .expect("generated grpc openapi bridge must be valid json");
-    Json(bridge)
+async fn grpc_contracts_openapi_bridge() -> Result<Json<Value>, (StatusCode, String)> {
+    serde_json::from_str(grpc_contract_openapi_bridge_json())
+        .map(Json)
+        .map_err(|err| {
+            tracing::error!(error = %err, "failed to parse generated grpc openapi bridge json");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal server error".to_string(),
+            )
+        })
 }
 
 fn map_error(err: AlloyError) -> (StatusCode, String) {
