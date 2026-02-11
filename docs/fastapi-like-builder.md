@@ -29,6 +29,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - `with_middleware(...)`: add custom router-level middleware
 - `on_startup(...)` / `on_shutdown(...)`: attach lifecycle hooks
 
+## DTO And Dependency Injection Pattern
+
+You can model FastAPI-like DTOs with `serde` and inject shared dependencies using `State<Arc<AppState>>`.
+
+```rust
+use std::sync::Arc;
+
+use alloy_core::AppState;
+use axum::{
+    extract::{Path, Query, State},
+    Json,
+};
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct NotePath {
+    id: String,
+}
+
+#[derive(Deserialize)]
+struct NoteQuery {
+    q: Option<String>,
+    limit: Option<u32>,
+}
+
+#[derive(Deserialize)]
+struct CreateNoteBody {
+    title: String,
+}
+
+#[derive(Serialize)]
+struct NoteResponse {
+    id: String,
+    title: String,
+}
+
+async fn get_note(
+    State(state): State<Arc<AppState>>,
+    Path(path): Path<NotePath>,
+) -> Json<NoteResponse> {
+    let title = state.greet(&path.id).unwrap_or_else(|_| "fallback".to_string());
+    Json(NoteResponse { id: path.id, title })
+}
+```
+
+See `/examples/simple-server/src/main.rs` for a runnable end-to-end example using these DTO styles.
+
 ## Notes
 
 - Default `AlloyServer::new()` enables both REST and gRPC on a single listener.

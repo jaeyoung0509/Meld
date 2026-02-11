@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package fixture.docs.v1;
+
+import "common.proto";
+
+service DocsService {
+  rpc GetDoc(GetDocRequest) returns (GetDocResponse);
+}
+
+message GetDocRequest {
+  fixture.common.v1.CommonMeta meta = 1;
+  repeated string fields = 2;
+
+  oneof selector {
+    string id = 3;
+    string slug = 4;
+  }
+
+  map<string, NestedInfo> labels = 5;
+
+  message NestedInfo {
+    string value = 1;
+    enum Scope {
+      SCOPE_UNSPECIFIED = 0;
+      INTERNAL = 1;
+      EXTERNAL = 2;
+    }
+    Scope scope = 2;
+  }
+}
+
+message GetDocResponse {
+  repeated Result results = 1;
+
+  message Result {
+    string id = 1;
+    Status status = 2;
+  }
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    READY = 1;
+    FAILED = 2;
+  }
+}

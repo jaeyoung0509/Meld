@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package fixture.common.v1;
+
+message CommonMeta {
+  string trace_id = 1;
+  map<string, string> tags = 2;
+}

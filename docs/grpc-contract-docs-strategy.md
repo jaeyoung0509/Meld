@@ -20,22 +20,23 @@ Provide human-readable and Swagger-compatible discovery docs for gRPC contracts 
 
 ## Chosen Strategy (Canonical For Alloy)
 
-Use a lightweight proto-first generator that emits:
+Use a descriptor-based generator that emits:
 - Markdown contract docs (`docs/generated/grpc-contracts.md`)
 - OpenAPI-compatible bridge JSON (`docs/generated/grpc-openapi-bridge.json`)
 
 Why this choice:
 - Keeps `.proto` as source-of-truth
+- Parses protobuf descriptors instead of regex, making complex proto syntax safer to handle
 - Produces browsable docs without introducing an HTTP gateway runtime
 - Works with current Alloy stack and can run in CI as a deterministic check
 
 ## Tooling
 
-- Generator: `scripts/generate_grpc_contract_docs.py`
+- Generator: `scripts/generate_grpc_contract_docs.sh` (calls `cargo run -p alloy-rpc --bin grpc-docgen`)
 - Drift check: `scripts/check_grpc_contract_docs.sh`
 
 Reproducible flow:
-1. Run `python3 scripts/generate_grpc_contract_docs.py`
+1. Run `./scripts/generate_grpc_contract_docs.sh`
 2. Commit updated artifacts under `docs/generated/`
 3. In CI, run `scripts/check_grpc_contract_docs.sh` and fail on drift
 
@@ -51,4 +52,4 @@ Reproducible flow:
 ## Limitations
 
 - OpenAPI bridge is contract-discovery oriented, not a drop-in REST execution spec.
-- Advanced protobuf constructs (oneof/map/nested complexity) are intentionally simplified in the bridge generator.
+- Protobuf coverage is broader than regex parsing, but this is still not a full HTTP transcoding layer.

@@ -4,9 +4,17 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[[bin]]
+name = "grpc-docgen"
+path = "src/bin/grpc_docgen.rs"
+
 [dependencies]
 alloy-core = { path = "../alloy-core" }
 prost.workspace = true
+prost-types = "0.13"
+protoc-bin-vendored.workspace = true
+serde_json.workspace = true
+tempfile = "3"
 tonic.workspace = true
 
 [build-dependencies]

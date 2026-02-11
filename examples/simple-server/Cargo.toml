@@ -8,4 +8,5 @@ license.workspace = true
 alloy-core = { path = "../../crates/alloy-core" }
 alloy-server = { path = "../../crates/alloy-server" }
 axum.workspace = true
+serde.workspace = true
 tokio.workspace = true
