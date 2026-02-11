@@ -43,3 +43,21 @@ fn map_error(err: AlloyError) -> (StatusCode, String) {
         AlloyError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::{Request, StatusCode};
+    use tower::util::ServiceExt;
+
+    #[tokio::test]
+    async fn health_returns_ok() {
+        let app = build_router(Arc::new(AppState::local("test-server")));
+        let response = app
+            .oneshot(Request::builder().uri("/health").body(axum::body::Body::empty()).unwrap())
+            .await
+            .expect("request should succeed");
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+}
