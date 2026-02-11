@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 
 use alloy_core::AppState;
 use alloy_server::{
@@ -8,10 +8,12 @@ use alloy_server::{
 use axum::{
     extract::{FromRequestParts, Path, State},
     http::request::Parts,
+    response::sse::{Event, KeepAlive, Sse},
     routing::get,
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use tokio_stream::{once, wrappers::IntervalStream, Stream, StreamExt};
 use validator::Validate;
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +46,13 @@ struct NoteResponse {
 struct NotesListResponse {
     query: Option<String>,
     limit: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct NoteEventPayload {
+    sequence: u64,
+    kind: String,
+    message: String,
 }
 
 #[derive(Debug, Clone)]
@@ -111,12 +120,58 @@ async fn create_note_raw(Json(body): Json<CreateNoteBody>) -> Json<NoteResponse>
     })
 }
 
+async fn stream_note_events() -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    Sse::new(note_event_stream()).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("heartbeat"),
+    )
+}
+
+fn note_event_stream() -> impl Stream<Item = Result<Event, Infallible>> {
+    let initial = once(Ok(note_event(0, "heartbeat")));
+    let mut sequence = 0u64;
+    let ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(2))).map(move |_| {
+        sequence += 1;
+        let kind = if sequence % 5 == 0 {
+            "heartbeat"
+        } else {
+            "note"
+        };
+        Ok(note_event(sequence, kind))
+    });
+    initial.chain(ticks)
+}
+
+fn note_event(sequence: u64, kind: &str) -> Event {
+    let payload = NoteEventPayload {
+        sequence,
+        kind: kind.to_string(),
+        message: format!("note event #{sequence}"),
+    };
+
+    match Event::default()
+        .id(sequence.to_string())
+        .event(kind)
+        .json_data(payload)
+    {
+        Ok(event) => event,
+        Err(err) => {
+            eprintln!("failed to serialize note event payload: {err}");
+            Event::default()
+                .event("internal_error")
+                .data("failed to serialize note event payload")
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState::local("simple-server"));
     let custom_router = Router::new()
         .route("/notes", get(list_notes).post(create_note))
         .route("/notes/raw", axum::routing::post(create_note_raw))
+        .route("/events", get(stream_note_events))
         .route("/notes/:id", get(get_note))
         .with_state(state.clone());
 
@@ -136,6 +191,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
     use axum::{body::to_bytes, http::Request};
+    use tokio::time::{timeout, Duration};
+    use tokio_stream::StreamExt;
     use tower::util::ServiceExt;
 
     fn app() -> Router {
@@ -143,6 +200,7 @@ mod tests {
         Router::new()
             .route("/notes", get(list_notes).post(create_note))
             .route("/notes/raw", axum::routing::post(create_note_raw))
+            .route("/events", get(stream_note_events))
             .route("/notes/:id", get(get_note))
             .with_state(state)
     }
@@ -231,5 +289,38 @@ mod tests {
             .expect("request should complete");
 
         assert_eq!(response.status(), axum::http::StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn events_route_streams_heartbeat_payload() {
+        let response = app()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/events")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("request should complete");
+
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+        let content_type = response
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .expect("content-type should exist")
+            .to_str()
+            .expect("content-type should be valid");
+        assert!(content_type.starts_with("text/event-stream"));
+
+        let mut stream = response.into_body().into_data_stream();
+        let first_chunk = timeout(Duration::from_secs(1), stream.next())
+            .await
+            .expect("first chunk should arrive")
+            .expect("stream item")
+            .expect("body bytes");
+        let first_text = String::from_utf8(first_chunk.to_vec()).expect("utf8 chunk");
+        assert!(first_text.contains("event: heartbeat"));
+        assert!(first_text.contains("\"kind\":\"heartbeat\""));
     }
 }

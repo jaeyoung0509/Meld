@@ -15,6 +15,7 @@ version = "0.1.0"
 [workspace.dependencies]
 axum = { version = "0.7", features = ["macros", "http2"] }
 tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
 serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 tracing = "0.1"

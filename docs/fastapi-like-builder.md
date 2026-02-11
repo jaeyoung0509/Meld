@@ -130,6 +130,40 @@ async fn create_note(Json(body): Json<CreateNoteBody>) -> Result<Json<String>, A
 
 If you omit `auto_validate`, behavior stays unchanged.
 
+## SSE Endpoint Pattern
+
+Alloy supports Server-Sent Events (SSE) for lightweight one-way real-time updates.
+
+```rust
+use std::{convert::Infallible, time::Duration};
+
+use axum::response::sse::{Event, KeepAlive, Sse};
+use tokio_stream::{once, wrappers::IntervalStream, Stream, StreamExt};
+
+async fn events() -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let initial = once(Ok(Event::default().event("heartbeat").data("ready")));
+    let mut sequence = 0u64;
+    let ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(2)))
+        .map(move |_| {
+            sequence += 1;
+            Ok(Event::default()
+                .event("message")
+                .data(format!("tick-{sequence}")))
+        });
+
+    Sse::new(initial.chain(ticks)).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("heartbeat"),
+    )
+}
+```
+
+Client reconnect guidance:
+- Use automatic reconnect with exponential backoff (for example 1s, 2s, 4s ... capped at 30s).
+- Add small jitter to avoid synchronized reconnect spikes.
+- Resume with `Last-Event-ID` when your client stack supports it.
+
 ## Depends-Like Extractor Pattern
 
 For FastAPI `Depends(...)` style injection, define a custom extractor via `FromRequestParts`.

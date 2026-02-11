@@ -1,6 +1,5 @@
 extern crate self as alloy_server;
-
-use std::sync::Arc;
+use std::{convert::Infallible, sync::Arc, time::Duration};
 
 use alloy_core::{AlloyError, AppState};
 use alloy_rpc::{
@@ -11,11 +10,13 @@ use axum::{
     extract::{Path, State},
     http::header,
     http::StatusCode,
+    response::sse::{Event, KeepAlive, Sse},
     routing::get,
     Json, Router,
 };
 use serde::Serialize;
 use serde_json::Value;
+use tokio_stream::{once, wrappers::IntervalStream, Stream, StreamExt};
 use tonic::service::Routes;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -43,6 +44,13 @@ pub struct HelloRestResponse {
     pub message: String,
 }
 
+#[derive(Debug, Serialize)]
+struct ServerSentEventPayload {
+    sequence: u64,
+    kind: &'static str,
+    service_name: String,
+}
+
 #[derive(OpenApi)]
 #[openapi(
     paths(root, health, hello),
@@ -58,6 +66,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/", get(root))
         .route("/health", get(health))
         .route("/hello/:name", get(hello))
+        .route("/events", get(events))
         .route("/grpc/contracts", get(grpc_contracts_markdown))
         .route(
             "/grpc/contracts/openapi.json",
@@ -129,6 +138,17 @@ async fn hello(
     }))
 }
 
+async fn events(
+    State(state): State<Arc<AppState>>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let stream = sse_event_stream(state.config.service_name.clone());
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("heartbeat"),
+    )
+}
+
 async fn grpc_contracts_markdown() -> ([(header::HeaderName, &'static str); 1], &'static str) {
     (
         [(header::CONTENT_TYPE, "text/markdown; charset=utf-8")],
@@ -155,11 +175,52 @@ fn map_error(err: AlloyError) -> (StatusCode, String) {
     }
 }
 
+fn sse_event_stream(service_name: String) -> impl Stream<Item = Result<Event, Infallible>> {
+    let init_name = service_name.clone();
+    let initial = once(Ok(build_sse_event(0, "heartbeat", &init_name)));
+    let mut sequence = 0u64;
+    let ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(2))).map(move |_| {
+        sequence += 1;
+        let kind = if sequence % 5 == 0 {
+            "heartbeat"
+        } else {
+            "message"
+        };
+        Ok(build_sse_event(sequence, kind, &service_name))
+    });
+
+    initial.chain(ticks)
+}
+
+fn build_sse_event(sequence: u64, kind: &'static str, service_name: &str) -> Event {
+    let payload = ServerSentEventPayload {
+        sequence,
+        kind,
+        service_name: service_name.to_string(),
+    };
+
+    match Event::default()
+        .id(sequence.to_string())
+        .event(kind)
+        .json_data(payload)
+    {
+        Ok(event) => event,
+        Err(err) => {
+            tracing::error!(error = %err, "failed to serialize sse payload");
+            Event::default()
+                .event("internal_error")
+                .data("failed to serialize event payload")
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use axum::body::to_bytes;
     use axum::http::{Request, StatusCode};
+    use tokio::time::{timeout, Duration};
+    use tokio_stream::StreamExt;
     use tower::util::ServiceExt;
 
     #[tokio::test]
@@ -238,5 +299,38 @@ mod tests {
             .expect("json body bytes");
         let json_text = String::from_utf8(json_bytes.to_vec()).expect("valid json text");
         assert!(json_text.contains("/alloy.v1.Greeter/SayHello"));
+    }
+
+    #[tokio::test]
+    async fn events_stream_returns_sse_headers_and_heartbeat_payload() {
+        let app = build_router(Arc::new(AppState::local("test-server")));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/events")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("request should succeed");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let content_type = response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content type should exist")
+            .to_str()
+            .expect("content type value");
+        assert!(content_type.starts_with("text/event-stream"));
+
+        let mut stream = response.into_body().into_data_stream();
+        let first_chunk = timeout(Duration::from_secs(1), stream.next())
+            .await
+            .expect("first chunk should arrive")
+            .expect("body stream item")
+            .expect("body bytes");
+        let first_text = String::from_utf8(first_chunk.to_vec()).expect("utf8 chunk");
+        assert!(first_text.contains("event: heartbeat"));
+        assert!(first_text.contains("\"kind\":\"heartbeat\""));
     }
 }
