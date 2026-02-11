@@ -158,9 +158,7 @@ pub async fn rest_auth_middleware(
 ) -> Response {
     match cfg.authenticate_headers(req.headers()) {
         Ok(principal) => {
-            if cfg.enabled {
-                req.extensions_mut().insert(principal);
-            }
+            req.extensions_mut().insert(principal);
             next.run(req).await
         }
         Err(rejection) => rejection.into_rest_response(),

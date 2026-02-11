@@ -186,8 +186,8 @@ async fn hello(
     path = "/protected/whoami",
     tag = "rest",
     responses(
-        (status = 200, description = "Authenticated principal", body = ProtectedWhoAmIResponse),
-        (status = 401, description = "Unauthorized", body = ApiErrorResponse)
+        (status = 200, description = "Current principal (authenticated user or anonymous when auth is disabled)", body = ProtectedWhoAmIResponse),
+        (status = 401, description = "Unauthorized (auth enabled and token missing/invalid)", body = ApiErrorResponse)
     )
 )]
 async fn protected_whoami(
@@ -502,6 +502,36 @@ mod tests {
             &EncodingKey::from_secret(secret.as_bytes()),
         )
         .expect("token should encode")
+    }
+
+    #[tokio::test]
+    async fn protected_route_returns_anonymous_when_auth_disabled() {
+        let app = build_router_with_auth(
+            Arc::new(AppState::local("test-server")),
+            auth::AuthRuntimeConfig {
+                enabled: false,
+                jwt_secret: None,
+                expected_issuer: None,
+                expected_audience: None,
+            },
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/protected/whoami")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("request should succeed");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body bytes");
+        let body_text = String::from_utf8(bytes.to_vec()).expect("utf8");
+        assert!(body_text.contains("anonymous"));
     }
 
     #[tokio::test]

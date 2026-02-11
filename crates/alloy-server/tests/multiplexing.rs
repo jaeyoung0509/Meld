@@ -95,6 +95,18 @@ async fn serves_rest_and_grpc_on_single_port() {
         .expect("swagger ui should be reachable");
     assert_eq!(docs_response.status().as_u16(), 200);
 
+    let whoami_response = rest_client
+        .get(format!("{base_url}/protected/whoami"))
+        .send()
+        .await
+        .expect("protected whoami should be reachable");
+    assert_eq!(whoami_response.status().as_u16(), 200);
+    let whoami_body = whoami_response
+        .text()
+        .await
+        .expect("protected whoami body should be readable");
+    assert!(whoami_body.contains("anonymous"));
+
     let openapi_response = rest_client
         .get(format!("{base_url}/openapi.json"))
         .send()
