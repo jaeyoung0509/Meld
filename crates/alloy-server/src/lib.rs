@@ -1,14 +1,19 @@
 use std::sync::Arc;
 
 use alloy_core::{AlloyError, AppState};
-use alloy_rpc::{build_hello_response, HelloRequest};
+use alloy_rpc::{
+    build_hello_response, grpc_contract_docs_markdown, grpc_contract_openapi_bridge_json,
+    HelloRequest,
+};
 use axum::{
     extract::{Path, State},
+    http::header,
     http::StatusCode,
     routing::get,
     Json, Router,
 };
 use serde::Serialize;
+use serde_json::Value;
 use tonic::service::Routes;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -47,6 +52,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/", get(root))
         .route("/health", get(health))
         .route("/hello/:name", get(hello))
+        .route("/grpc/contracts", get(grpc_contracts_markdown))
+        .route("/grpc/contracts/openapi.json", get(grpc_contracts_openapi_bridge))
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }
@@ -113,6 +120,19 @@ async fn hello(
     }))
 }
 
+async fn grpc_contracts_markdown() -> ([(header::HeaderName, &'static str); 1], &'static str) {
+    (
+        [(header::CONTENT_TYPE, "text/markdown; charset=utf-8")],
+        grpc_contract_docs_markdown(),
+    )
+}
+
+async fn grpc_contracts_openapi_bridge() -> Json<Value> {
+    let bridge = serde_json::from_str(grpc_contract_openapi_bridge_json())
+        .expect("generated grpc openapi bridge must be valid json");
+    Json(bridge)
+}
+
 fn map_error(err: AlloyError) -> (StatusCode, String) {
     match err {
         AlloyError::Validation(message) => (StatusCode::BAD_REQUEST, message),
@@ -159,5 +179,44 @@ mod tests {
         let body_text = String::from_utf8(bytes.to_vec()).expect("valid utf8");
         assert!(body_text.contains("/health"));
         assert!(body_text.contains("/hello/{name}"));
+    }
+
+    #[tokio::test]
+    async fn grpc_contract_docs_are_available() {
+        let app = build_router(Arc::new(AppState::local("test-server")));
+        let markdown_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/grpc/contracts")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("markdown request should succeed");
+
+        assert_eq!(markdown_response.status(), StatusCode::OK);
+        let markdown_bytes = to_bytes(markdown_response.into_body(), usize::MAX)
+            .await
+            .expect("markdown body bytes");
+        let markdown_text = String::from_utf8(markdown_bytes.to_vec()).expect("valid markdown");
+        assert!(markdown_text.contains("gRPC Contract Documentation"));
+
+        let json_response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/grpc/contracts/openapi.json")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("json request should succeed");
+        assert_eq!(json_response.status(), StatusCode::OK);
+
+        let json_bytes = to_bytes(json_response.into_body(), usize::MAX)
+            .await
+            .expect("json body bytes");
+        let json_text = String::from_utf8(json_bytes.to_vec()).expect("valid json text");
+        assert!(json_text.contains("/alloy.v1.Greeter/SayHello"));
     }
 }

@@ -1,0 +1,69 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Alloy gRPC Contract Bridge",
+    "version": "0.1.0",
+    "description": "Swagger-compatible contract view generated from .proto for discovery."
+  },
+  "paths": {
+    "/alloy.v1.Greeter/SayHello": {
+      "post": {
+        "summary": "Greeter.SayHello",
+        "description": "Swagger-compatible bridge for gRPC method contract discovery.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/grpc+proto": {
+              "schema": {
+                "$ref": "#/components/schemas/alloy.v1.HelloRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "gRPC success response payload shape",
+            "content": {
+              "application/grpc+proto": {
+                "schema": {
+                  "$ref": "#/components/schemas/alloy.v1.HelloResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-alloy-grpc": {
+          "package": "alloy.v1",
+          "service": "Greeter",
+          "method": "SayHello"
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "alloy.v1.HelloRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "alloy.v1.HelloResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      }
+    }
+  }
+}
