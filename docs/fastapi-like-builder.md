@@ -108,6 +108,28 @@ Validation failures return a structured `400` error JSON with:
 - `message`
 - `details` (field-level messages)
 
+## Auto-Validate Route Macro (FastAPI-Like DX)
+
+For a more FastAPI-like handler style, use `#[alloy_server::route(..., auto_validate)]`.
+
+With `auto_validate`, handler arguments are rewritten at compile time:
+- `Json<T>` -> `ValidatedJson<T>`
+- `Query<T>` -> `ValidatedQuery<T>`
+
+Example:
+
+```rust
+use alloy_server::api::ApiError;
+use axum::Json;
+
+#[alloy_server::route(post, "/notes", auto_validate)]
+async fn create_note(Json(body): Json<CreateNoteBody>) -> Result<Json<String>, ApiError> {
+    Ok(Json(body.title))
+}
+```
+
+If you omit `auto_validate`, behavior stays unchanged.
+
 ## Depends-Like Extractor Pattern
 
 For FastAPI `Depends(...)` style injection, define a custom extractor via `FromRequestParts`.

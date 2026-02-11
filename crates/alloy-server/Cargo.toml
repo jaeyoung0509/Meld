@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 alloy-core = { path = "../alloy-core" }
+alloy-macros = { path = "../alloy-macros" }
 alloy-rpc = { path = "../alloy-rpc" }
 axum.workspace = true
 tokio.workspace = true

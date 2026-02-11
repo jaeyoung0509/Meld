@@ -1,6 +1,9 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse::Parse, parse_macro_input, Error, Ident, ItemFn, LitStr, Token};
+use syn::{
+    parse::Parse, parse_macro_input, parse_quote, Error, FnArg, GenericArgument, Ident, ItemFn,
+    LitStr, Pat, PatTupleStruct, PathArguments, Token, Type,
+};
 
 struct RouteArgs {
     method: RouteMethod,
@@ -48,12 +51,7 @@ impl Parse for RouteArgs {
             let flag: Ident = input.parse()?;
             match flag.to_string().as_str() {
                 "auto_validate" => auto_validate = true,
-                _ => {
-                    return Err(Error::new(
-                        flag.span(),
-                        format!("unknown flag `{}`", flag),
-                    ))
-                }
+                _ => return Err(Error::new(flag.span(), format!("unknown flag `{}`", flag))),
             }
         }
 
@@ -68,16 +66,73 @@ impl Parse for RouteArgs {
 #[proc_macro_attribute]
 pub fn route(args: TokenStream, item: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(args as RouteArgs);
-    let item_fn = parse_macro_input!(item as ItemFn);
-    let _ = (parsed.method, parsed.path, parsed.auto_validate);
+    let mut item_fn = parse_macro_input!(item as ItemFn);
+
+    if parsed.auto_validate {
+        apply_auto_validate(&mut item_fn);
+    }
+
+    let _ = (parsed.method, parsed.path);
 
     TokenStream::from(quote! { #item_fn })
+}
+
+fn apply_auto_validate(item_fn: &mut ItemFn) {
+    for input in &mut item_fn.sig.inputs {
+        if let FnArg::Typed(arg) = input {
+            maybe_rewrite_typed_arg(arg);
+        }
+    }
+}
+
+fn maybe_rewrite_typed_arg(arg: &mut syn::PatType) {
+    let Some(rewritten_path) = rewrite_extractor_type(&mut arg.ty) else {
+        return;
+    };
+
+    if let Pat::TupleStruct(PatTupleStruct { path, .. }) = arg.pat.as_mut() {
+        *path = rewritten_path;
+    }
+}
+
+fn rewrite_extractor_type(ty: &mut Box<Type>) -> Option<syn::Path> {
+    let Type::Path(type_path) = ty.as_mut() else {
+        return None;
+    };
+
+    let segment = type_path.path.segments.last()?;
+    let inner_ty = extract_single_generic_type(&segment.arguments)?;
+    let rewritten_path: syn::Path = match segment.ident.to_string().as_str() {
+        "Json" => parse_quote!(::alloy_server::api::ValidatedJson),
+        "Query" => parse_quote!(::alloy_server::api::ValidatedQuery),
+        _ => return None,
+    };
+    let rewritten_ty: Type = parse_quote!(#rewritten_path<#inner_ty>);
+
+    if !matches!(rewritten_ty, Type::Path(_)) {
+        return None;
+    }
+    *ty = Box::new(rewritten_ty);
+    Some(rewritten_path)
+}
+
+fn extract_single_generic_type(arguments: &PathArguments) -> Option<Type> {
+    let PathArguments::AngleBracketed(args) = arguments else {
+        return None;
+    };
+    if args.args.len() != 1 {
+        return None;
+    }
+    match args.args.first() {
+        Some(GenericArgument::Type(ty)) => Some(ty.clone()),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syn::parse_str;
+    use syn::{parse_quote, parse_str};
 
     #[test]
     fn parses_method_path_and_auto_validate_flag() {
@@ -91,8 +146,7 @@ mod tests {
 
     #[test]
     fn parses_without_auto_validate() {
-        let parsed = parse_str::<RouteArgs>(r#"get, "/health""#)
-            .expect("route args should parse");
+        let parsed = parse_str::<RouteArgs>(r#"get, "/health""#).expect("route args should parse");
 
         assert_eq!(parsed.method, RouteMethod::Get);
         assert_eq!(parsed.path.value(), "/health");
@@ -135,5 +189,74 @@ mod tests {
             Err(err) => err,
         };
         assert!(err.to_string().contains("string"));
+    }
+
+    #[test]
+    fn auto_validate_rewrites_json_and_query_extractors() {
+        let mut item_fn: ItemFn = parse_quote! {
+            async fn create_note(Query(q): Query<ListQuery>, Json(body): Json<CreateNote>) {}
+        };
+
+        apply_auto_validate(&mut item_fn);
+
+        let first = item_fn
+            .sig
+            .inputs
+            .iter()
+            .next()
+            .expect("first arg should exist");
+        let second = item_fn
+            .sig
+            .inputs
+            .iter()
+            .nth(1)
+            .expect("second arg should exist");
+
+        assert_eq!(arg_type_ident(first), Some("ValidatedQuery".to_string()));
+        assert_eq!(arg_pat_ident(first), Some("ValidatedQuery".to_string()));
+        assert_eq!(arg_type_ident(second), Some("ValidatedJson".to_string()));
+        assert_eq!(arg_pat_ident(second), Some("ValidatedJson".to_string()));
+    }
+
+    #[test]
+    fn without_auto_validate_keeps_original_extractors() {
+        let mut item_fn: ItemFn = parse_quote! {
+            async fn create_note(Query(q): Query<ListQuery>, Json(body): Json<CreateNote>) {}
+        };
+        let args = parse_str::<RouteArgs>(r#"post, "/notes""#).expect("route args should parse");
+
+        if args.auto_validate {
+            apply_auto_validate(&mut item_fn);
+        }
+
+        let rendered = quote!(#item_fn).to_string();
+        assert!(rendered.contains("Query"));
+        assert!(rendered.contains("Json"));
+        assert!(!rendered.contains("ValidatedQuery"));
+        assert!(!rendered.contains("ValidatedJson"));
+    }
+
+    fn arg_type_ident(arg: &FnArg) -> Option<String> {
+        let FnArg::Typed(arg) = arg else {
+            return None;
+        };
+        let Type::Path(type_path) = arg.ty.as_ref() else {
+            return None;
+        };
+        type_path.path.segments.last().map(|s| s.ident.to_string())
+    }
+
+    fn arg_pat_ident(arg: &FnArg) -> Option<String> {
+        let FnArg::Typed(arg) = arg else {
+            return None;
+        };
+        let Pat::TupleStruct(tuple_struct) = arg.pat.as_ref() else {
+            return None;
+        };
+        tuple_struct
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
     }
 }

@@ -1,3 +1,5 @@
+extern crate self as alloy_server;
+
 use std::sync::Arc;
 
 use alloy_core::{AlloyError, AppState};
@@ -18,10 +20,11 @@ use tonic::service::Routes;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-pub mod builder;
 pub mod api;
+pub mod builder;
 pub mod grpc;
 pub mod middleware;
+pub use alloy_macros::route;
 pub use builder::AlloyServer;
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -56,7 +59,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/health", get(health))
         .route("/hello/:name", get(hello))
         .route("/grpc/contracts", get(grpc_contracts_markdown))
-        .route("/grpc/contracts/openapi.json", get(grpc_contracts_openapi_bridge))
+        .route(
+            "/grpc/contracts/openapi.json",
+            get(grpc_contracts_openapi_bridge),
+        )
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }
@@ -160,7 +166,12 @@ mod tests {
     async fn health_returns_ok() {
         let app = build_router(Arc::new(AppState::local("test-server")));
         let response = app
-            .oneshot(Request::builder().uri("/health").body(axum::body::Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
             .await
             .expect("request should succeed");
 
