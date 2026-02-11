@@ -12,9 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let state = Arc::new(AppState {
-        service_name: "alloy-server".to_string(),
-    });
+    let state = Arc::new(AppState::local("alloy-server"));
 
     let app = build_router(state);
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

@@ -23,6 +23,7 @@ dependencies = [
 name = "alloy-rpc"
 version = "0.1.0"
 dependencies = [
+ "alloy-core",
  "prost",
  "serde",
 ]
