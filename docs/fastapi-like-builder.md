@@ -206,8 +206,36 @@ When disabled:
 
 ## Depends-Like Extractor Pattern
 
-For FastAPI `Depends(...)` style injection, define a custom extractor via `FromRequestParts`.
-See `RequestContext` in `/examples/simple-server/src/main.rs` for a practical pattern.
+For FastAPI `Depends(...)` style injection, use `alloy_server::di::Depends<T>`.
+`Depends<T>` resolves dependencies from state (`FromRef`) with request-scoped caching.
+
+```rust
+use std::sync::Arc;
+
+use alloy_core::AppState;
+use alloy_server::di::Depends;
+use axum::extract::FromRef;
+
+#[derive(Clone)]
+struct ServiceInfo {
+    service_name: String,
+}
+
+impl FromRef<Arc<AppState>> for ServiceInfo {
+    fn from_ref(state: &Arc<AppState>) -> Self {
+        Self {
+            service_name: state.config.service_name.clone(),
+        }
+    }
+}
+
+async fn handler(Depends(info): Depends<ServiceInfo>) -> String {
+    info.service_name
+}
+```
+
+Test override helper:
+- `alloy_server::di::with_dependency_override(router, value)`
 
 ## Notes
 
