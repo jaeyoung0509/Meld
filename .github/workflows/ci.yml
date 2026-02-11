@@ -1,0 +1,64 @@
+name: Alloy CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+
+jobs:
+  core-build-test:
+    name: Core Build And Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Workspace check
+        run: cargo check --workspace
+
+      - name: Workspace tests
+        run: cargo test --workspace
+
+  rest-grpc-e2e:
+    name: REST gRPC E2E
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run multiplexing integration test
+        run: cargo test -p alloy-server --test multiplexing -- --nocapture
+
+  docs-contract:
+    name: Docs Contract Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Check generated gRPC docs are up-to-date
+        run: ./scripts/check_grpc_contract_docs.sh
+
+      - name: Verify OpenAPI route test
+        run: cargo test -p alloy-server openapi_json_is_available -- --nocapture

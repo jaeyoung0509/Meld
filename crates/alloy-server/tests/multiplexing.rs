@@ -3,6 +3,7 @@ use std::sync::Arc;
 use alloy_core::AppState;
 use alloy_rpc::{GreeterClient, HelloRequest};
 use alloy_server::{build_multiplexed_router, middleware};
+use axum::http::header;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 
@@ -63,6 +64,36 @@ async fn serves_rest_and_grpc_on_single_port() {
             .expect("request id must be valid header"),
         "rest-hello-id"
     );
+
+    let docs_response = rest_client
+        .get(format!("{base_url}/docs"))
+        .send()
+        .await
+        .expect("swagger ui should be reachable");
+    assert_eq!(docs_response.status().as_u16(), 200);
+
+    let openapi_response = rest_client
+        .get(format!("{base_url}/openapi.json"))
+        .send()
+        .await
+        .expect("openapi json should be reachable");
+    assert_eq!(openapi_response.status().as_u16(), 200);
+    assert_eq!(
+        openapi_response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("content-type header")
+            .to_str()
+            .expect("content-type value"),
+        "application/json"
+    );
+
+    let grpc_bridge_response = rest_client
+        .get(format!("{base_url}/grpc/contracts/openapi.json"))
+        .send()
+        .await
+        .expect("grpc bridge json should be reachable");
+    assert_eq!(grpc_bridge_response.status().as_u16(), 200);
 
     let mut grpc_client = GreeterClient::connect(base_url)
         .await
