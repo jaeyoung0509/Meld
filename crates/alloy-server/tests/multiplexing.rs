@@ -4,8 +4,10 @@ use alloy_core::AppState;
 use alloy_rpc::{GreeterClient, HelloRequest};
 use alloy_server::{build_multiplexed_router, middleware};
 use axum::http::header;
+use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
+use tokio_tungstenite::tungstenite::Message;
 
 #[tokio::test]
 async fn serves_rest_and_grpc_on_single_port() {
@@ -30,6 +32,7 @@ async fn serves_rest_and_grpc_on_single_port() {
     });
 
     let base_url = format!("http://{addr}");
+    let ws_url = format!("ws://{addr}/ws");
 
     // Basic retry to avoid flaky startup race in CI.
     let rest_client = reqwest::Client::builder()
@@ -109,6 +112,28 @@ async fn serves_rest_and_grpc_on_single_port() {
         .await
         .expect("grpc bridge json should be reachable");
     assert_eq!(grpc_bridge_response.status().as_u16(), 200);
+
+    let (mut ws_stream, ws_resp) = tokio_tungstenite::connect_async(ws_url)
+        .await
+        .expect("websocket handshake should succeed");
+    assert_eq!(ws_resp.status().as_u16(), 101);
+    ws_stream
+        .send(Message::Text("hello-alloy".to_string()))
+        .await
+        .expect("ws send should succeed");
+    let ws_message = ws_stream
+        .next()
+        .await
+        .expect("ws message item should exist")
+        .expect("ws message should be valid");
+    match ws_message {
+        Message::Text(text) => assert_eq!(text, "echo: hello-alloy"),
+        other => panic!("expected text frame, got {other:?}"),
+    }
+    ws_stream
+        .close(None)
+        .await
+        .expect("ws close should succeed");
 
     let mut grpc_client = GreeterClient::connect(base_url)
         .await

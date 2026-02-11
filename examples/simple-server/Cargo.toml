@@ -15,4 +15,6 @@ tokio-stream.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+futures-util.workspace = true
+tokio-tungstenite.workspace = true
 tower.workspace = true

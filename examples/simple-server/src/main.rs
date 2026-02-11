@@ -6,6 +6,7 @@ use alloy_server::{
     AlloyServer,
 };
 use axum::{
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::{FromRequestParts, Path, State},
     http::request::Parts,
     response::sse::{Event, KeepAlive, Sse},
@@ -165,6 +166,56 @@ fn note_event(sequence: u64, kind: &str) -> Event {
     }
 }
 
+const WS_MAX_TEXT_BYTES: usize = 4 * 1024;
+const WS_IDLE_TIMEOUT: Duration = Duration::from_secs(45);
+
+async fn ws_echo(ws: WebSocketUpgrade) -> impl axum::response::IntoResponse {
+    ws.max_message_size(WS_MAX_TEXT_BYTES)
+        .on_upgrade(handle_ws_echo_session)
+}
+
+async fn handle_ws_echo_session(mut socket: WebSocket) {
+    loop {
+        let next_message = tokio::time::timeout(WS_IDLE_TIMEOUT, socket.recv()).await;
+        let Some(result) = (match next_message {
+            Ok(result) => result,
+            Err(_) => {
+                let _ = socket.close().await;
+                return;
+            }
+        }) else {
+            return;
+        };
+
+        match result {
+            Ok(Message::Text(text)) => {
+                if text.len() > WS_MAX_TEXT_BYTES {
+                    let _ = socket.send(Message::Close(None)).await;
+                    return;
+                }
+                if socket
+                    .send(Message::Text(format!("echo: {text}")))
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+            }
+            Ok(Message::Ping(payload)) => {
+                if socket.send(Message::Pong(payload)).await.is_err() {
+                    return;
+                }
+            }
+            Ok(Message::Close(_)) => {
+                let _ = socket.close().await;
+                return;
+            }
+            Ok(_) => {}
+            Err(_) => return,
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState::local("simple-server"));
@@ -172,6 +223,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/notes", get(list_notes).post(create_note))
         .route("/notes/raw", axum::routing::post(create_note_raw))
         .route("/events", get(stream_note_events))
+        .route("/ws", get(ws_echo))
         .route("/notes/:id", get(get_note))
         .with_state(state.clone());
 
@@ -191,8 +243,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod tests {
     use super::*;
     use axum::{body::to_bytes, http::Request};
+    use futures_util::{SinkExt, StreamExt as FuturesStreamExt};
+    use tokio::net::TcpListener;
+    use tokio::sync::oneshot;
     use tokio::time::{timeout, Duration};
-    use tokio_stream::StreamExt;
+    use tokio_tungstenite::tungstenite::Message as WsMessage;
     use tower::util::ServiceExt;
 
     fn app() -> Router {
@@ -201,6 +256,7 @@ mod tests {
             .route("/notes", get(list_notes).post(create_note))
             .route("/notes/raw", axum::routing::post(create_note_raw))
             .route("/events", get(stream_note_events))
+            .route("/ws", get(ws_echo))
             .route("/notes/:id", get(get_note))
             .with_state(state)
     }
@@ -314,13 +370,60 @@ mod tests {
         assert!(content_type.starts_with("text/event-stream"));
 
         let mut stream = response.into_body().into_data_stream();
-        let first_chunk = timeout(Duration::from_secs(1), stream.next())
-            .await
-            .expect("first chunk should arrive")
-            .expect("stream item")
-            .expect("body bytes");
+        let first_chunk = timeout(
+            Duration::from_secs(1),
+            tokio_stream::StreamExt::next(&mut stream),
+        )
+        .await
+        .expect("first chunk should arrive")
+        .expect("stream item")
+        .expect("body bytes");
         let first_text = String::from_utf8(first_chunk.to_vec()).expect("utf8 chunk");
         assert!(first_text.contains("event: heartbeat"));
         assert!(first_text.contains("\"kind\":\"heartbeat\""));
+    }
+
+    #[tokio::test]
+    async fn ws_route_handshake_and_echo() {
+        let app = app();
+        let listener = TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .expect("bind test listener");
+        let addr = listener.local_addr().expect("listener addr");
+        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app)
+                .with_graceful_shutdown(async {
+                    let _ = shutdown_rx.await;
+                })
+                .await
+                .expect("server should run");
+        });
+
+        let ws_url = format!("ws://{addr}/ws");
+        let (mut ws_stream, ws_resp) = tokio_tungstenite::connect_async(ws_url)
+            .await
+            .expect("websocket handshake should succeed");
+        assert_eq!(ws_resp.status().as_u16(), 101);
+
+        ws_stream
+            .send(WsMessage::Text("hello-note".to_string()))
+            .await
+            .expect("ws send should succeed");
+        let ws_message = FuturesStreamExt::next(&mut ws_stream)
+            .await
+            .expect("ws message item should exist")
+            .expect("ws message should be valid");
+        match ws_message {
+            WsMessage::Text(text) => assert_eq!(text, "echo: hello-note"),
+            other => panic!("expected text frame, got {other:?}"),
+        }
+        ws_stream
+            .close(None)
+            .await
+            .expect("ws close should succeed");
+
+        let _ = shutdown_tx.send(());
+        let _ = server.await;
     }
 }

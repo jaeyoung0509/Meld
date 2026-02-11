@@ -1,5 +1,5 @@
 extern crate self as alloy_server;
-use std::{convert::Infallible, sync::Arc, time::Duration};
+use std::{convert::Infallible, env, sync::Arc, time::Duration};
 
 use alloy_core::{AlloyError, AppState};
 use alloy_rpc::{
@@ -7,6 +7,7 @@ use alloy_rpc::{
     HelloRequest,
 };
 use axum::{
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::{Path, State},
     http::header,
     http::StatusCode,
@@ -67,6 +68,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/health", get(health))
         .route("/hello/:name", get(hello))
         .route("/events", get(events))
+        .route("/ws", get(ws_handler))
         .route("/grpc/contracts", get(grpc_contracts_markdown))
         .route(
             "/grpc/contracts/openapi.json",
@@ -147,6 +149,89 @@ async fn events(
             .interval(Duration::from_secs(15))
             .text("heartbeat"),
     )
+}
+
+const WS_DEFAULT_MAX_TEXT_BYTES: usize = 4 * 1024;
+const WS_DEFAULT_IDLE_TIMEOUT_SECS: u64 = 45;
+
+#[derive(Clone, Copy)]
+struct WsRuntimeConfig {
+    max_text_bytes: usize,
+    idle_timeout: Duration,
+}
+
+async fn ws_handler(ws: WebSocketUpgrade) -> impl axum::response::IntoResponse {
+    let cfg = ws_runtime_config();
+    ws.max_message_size(cfg.max_text_bytes)
+        .on_upgrade(move |socket| handle_ws_session(socket, cfg))
+}
+
+async fn handle_ws_session(mut socket: WebSocket, cfg: WsRuntimeConfig) {
+    tracing::info!("websocket connection opened");
+    loop {
+        let next_message = tokio::time::timeout(cfg.idle_timeout, socket.recv()).await;
+        let Some(result) = (match next_message {
+            Ok(result) => result,
+            Err(_) => {
+                tracing::info!("websocket idle timeout reached, closing connection");
+                let _ = socket.close().await;
+                return;
+            }
+        }) else {
+            tracing::info!("websocket connection closed by client");
+            return;
+        };
+
+        match result {
+            Ok(Message::Text(text)) => {
+                if text.len() > cfg.max_text_bytes {
+                    let _ = socket.send(Message::Close(None)).await;
+                    return;
+                }
+                if socket
+                    .send(Message::Text(format!("echo: {text}")))
+                    .await
+                    .is_err()
+                {
+                    tracing::warn!("failed to send websocket text frame");
+                    return;
+                }
+            }
+            Ok(Message::Ping(payload)) => {
+                if socket.send(Message::Pong(payload)).await.is_err() {
+                    tracing::warn!("failed to send websocket pong");
+                    return;
+                }
+            }
+            Ok(Message::Close(_)) => {
+                let _ = socket.close().await;
+                return;
+            }
+            Ok(_) => {}
+            Err(err) => {
+                tracing::warn!(error = %err, "websocket receive error");
+                return;
+            }
+        }
+    }
+}
+
+fn ws_runtime_config() -> WsRuntimeConfig {
+    let max_text_bytes = env::var("ALLOY_WS_MAX_TEXT_BYTES")
+        .ok()
+        .and_then(|raw| raw.parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(WS_DEFAULT_MAX_TEXT_BYTES);
+    let idle_timeout_secs = env::var("ALLOY_WS_IDLE_TIMEOUT_SECS")
+        .ok()
+        .and_then(|raw| raw.parse::<u64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(WS_DEFAULT_IDLE_TIMEOUT_SECS);
+
+    WsRuntimeConfig {
+        max_text_bytes,
+        idle_timeout: Duration::from_secs(idle_timeout_secs),
+    }
 }
 
 async fn grpc_contracts_markdown() -> ([(header::HeaderName, &'static str); 1], &'static str) {

@@ -15,6 +15,8 @@ Alloy is a Rust server framework focused on **FastAPI-like developer ergonomics*
   - `/grpc/contracts/openapi.json`
 - REST SSE stream:
   - `/events`
+- REST WebSocket echo:
+  - `/ws`
 - Fluent server builder API:
   - `AlloyServer::new().with_...().run()`
 - Shared middleware stack:
@@ -41,7 +43,12 @@ ALLOY_SERVER_ADDR=127.0.0.1:4000 cargo run -p alloy-server
 curl -s http://127.0.0.1:3000/health
 curl -s http://127.0.0.1:3000/hello/Rust
 curl -N http://127.0.0.1:3000/events
+# ws check (requires websocat): websocat ws://127.0.0.1:3000/ws
 ```
+
+WebSocket defaults:
+- max text frame: `4096` bytes (`ALLOY_WS_MAX_TEXT_BYTES`)
+- idle timeout: `45` seconds (`ALLOY_WS_IDLE_TIMEOUT_SECS`)
 
 ### 3) Open docs
 
