@@ -12,3 +12,11 @@ pub fn build_hello_response(state: &AppState, request: HelloRequest) -> AlloyRes
     let message = state.greet(&request.name)?;
     Ok(HelloResponse { message })
 }
+
+pub fn grpc_contract_docs_markdown() -> &'static str {
+    include_str!("../../../docs/generated/grpc-contracts.md")
+}
+
+pub fn grpc_contract_openapi_bridge_json() -> &'static str {
+    include_str!("../../../docs/generated/grpc-openapi-bridge.json")
+}
