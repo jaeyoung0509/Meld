@@ -1,0 +1,11 @@
+[package]
+name = "simple-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+alloy-core = { path = "../../crates/alloy-core" }
+alloy-server = { path = "../../crates/alloy-server" }
+axum.workspace = true
+tokio.workspace = true

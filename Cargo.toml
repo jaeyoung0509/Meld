@@ -1,0 +1,25 @@
+[workspace]
+members = [
+  "crates/alloy-core",
+  "crates/alloy-rpc",
+  "crates/alloy-server",
+  "examples/simple-server",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+version = "0.1.0"
+
+[workspace.dependencies]
+axum = { version = "0.7", features = ["macros", "http2"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tonic = { version = "0.12", features = ["transport"] }
+prost = "0.13"
+tower = "0.5"
+tower-http = { version = "0.5", features = ["trace"] }
