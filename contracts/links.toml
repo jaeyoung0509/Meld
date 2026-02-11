@@ -1,0 +1,12 @@
+version = 1
+
+[coverage]
+allow_unmapped_rest_operation_ids = ["root", "health", "protected_whoami"]
+allow_unmapped_grpc_methods = []
+
+[[links]]
+rest_operation_id = "hello"
+grpc_method = "meld.v1.Greeter/SayHello"
+rest_method = "GET"
+rest_path = "/hello/{name}"
+notes = "REST hello endpoint mirrors gRPC Greeter.SayHello request/response semantics."

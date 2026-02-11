@@ -1,6 +1,6 @@
 # CI Workflow
 
-This project uses three CI jobs so failures are clearly scoped:
+This project uses focused CI jobs so failures are clearly scoped:
 
 1. `Core Build And Test`
 - `cargo check --workspace`
@@ -10,8 +10,11 @@ This project uses three CI jobs so failures are clearly scoped:
 - `cargo test -p meld-server --test multiplexing -- --nocapture`
 
 3. `Docs Contract Drift Check`
-- `./scripts/check_grpc_contract_docs.sh`
+- `./scripts/check_contracts_bundle.sh`
 - `cargo test -p meld-server openapi_json_is_available -- --nocapture`
+
+4. `Security Audit`
+- `cargo audit`
 
 ## Local Equivalent
 

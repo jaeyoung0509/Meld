@@ -1,0 +1,71 @@
+{
+  "coverage": {
+    "allow_unmapped_grpc_methods": [],
+    "allow_unmapped_rest_operation_ids": [
+      "health",
+      "protected_whoami",
+      "root"
+    ],
+    "unmapped_grpc_methods": [],
+    "unmapped_rest_operation_ids": []
+  },
+  "grpc": {
+    "method_count": 1,
+    "methods": [
+      {
+        "grpc_method": "meld.v1.Greeter/SayHello",
+        "http_method": "POST",
+        "path": "/meld.v1.Greeter/SayHello",
+        "request_schema_ref": "#/components/schemas/meld.v1.HelloRequest",
+        "response_schema_ref": "#/components/schemas/meld.v1.HelloResponse",
+        "summary": "Greeter.SayHello"
+      }
+    ]
+  },
+  "links": [
+    {
+      "grpc_http_method": "POST",
+      "grpc_method": "meld.v1.Greeter/SayHello",
+      "grpc_path": "/meld.v1.Greeter/SayHello",
+      "notes": "REST hello endpoint mirrors gRPC Greeter.SayHello request/response semantics.",
+      "rest_method": "GET",
+      "rest_operation_id": "hello",
+      "rest_path": "/hello/{name}"
+    }
+  ],
+  "rest": {
+    "operation_count": 4,
+    "operations": [
+      {
+        "method": "GET",
+        "operation_id": "health",
+        "path": "/health",
+        "summary": null
+      },
+      {
+        "method": "GET",
+        "operation_id": "hello",
+        "path": "/hello/{name}",
+        "summary": null
+      },
+      {
+        "method": "GET",
+        "operation_id": "protected_whoami",
+        "path": "/protected/whoami",
+        "summary": null
+      },
+      {
+        "method": "GET",
+        "operation_id": "root",
+        "path": "/",
+        "summary": null
+      }
+    ]
+  },
+  "sources": {
+    "grpc_openapi_bridge": "docs/generated/grpc-openapi-bridge.json",
+    "links_toml": "contracts/links.toml",
+    "rest_openapi": "docs/generated/rest-openapi.json"
+  },
+  "version": 1
+}

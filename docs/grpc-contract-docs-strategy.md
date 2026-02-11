@@ -33,18 +33,21 @@ Why this choice:
 ## Tooling
 
 - Generator: `scripts/generate_grpc_contract_docs.sh` (calls `cargo run -p meld-rpc --bin grpc-docgen`)
-- Drift check: `scripts/check_grpc_contract_docs.sh`
+- Bundled generator flow: `scripts/generate_contracts_bundle.sh`
+- Drift check used in CI: `scripts/check_contracts_bundle.sh`
 
 Reproducible flow:
-1. Run `./scripts/generate_grpc_contract_docs.sh`
+1. Run `./scripts/generate_contracts_bundle.sh`
 2. Commit updated artifacts under `docs/generated/`
-3. In CI, run `scripts/check_grpc_contract_docs.sh` and fail on drift
+3. In CI, run `scripts/check_contracts_bundle.sh` and fail on drift
 
 ## Published Paths
 
 - Artifact paths:
   - `docs/generated/grpc-contracts.md`
   - `docs/generated/grpc-openapi-bridge.json`
+  - `docs/generated/rest-openapi.json`
+  - `docs/generated/contracts-bundle.json`
 - Runtime endpoints:
   - `GET /grpc/contracts` (rendered HTML)
   - `GET /grpc/contracts.md` (raw markdown)
