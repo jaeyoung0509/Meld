@@ -46,7 +46,8 @@ Reproducible flow:
   - `docs/generated/grpc-contracts.md`
   - `docs/generated/grpc-openapi-bridge.json`
 - Runtime endpoints:
-  - `GET /grpc/contracts`
+  - `GET /grpc/contracts` (rendered HTML)
+  - `GET /grpc/contracts.md` (raw markdown)
   - `GET /grpc/contracts/openapi.json`
 
 ## Limitations

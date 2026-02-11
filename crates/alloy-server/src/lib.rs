@@ -1,5 +1,10 @@
 extern crate self as alloy_server;
-use std::{convert::Infallible, env, sync::Arc, time::Duration};
+use std::{
+    convert::Infallible,
+    env,
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
 
 use alloy_core::{AlloyError, AppState};
 use alloy_rpc::{
@@ -12,10 +17,14 @@ use axum::{
     http::header,
     http::StatusCode,
     middleware::from_fn_with_state,
-    response::sse::{Event, KeepAlive, Sse},
+    response::{
+        sse::{Event, KeepAlive, Sse},
+        Html,
+    },
     routing::get,
     Json, Router,
 };
+use pulldown_cmark::{html::push_html, Options, Parser};
 use serde::Serialize;
 use serde_json::Value;
 use tokio_stream::{once, wrappers::IntervalStream, Stream, StreamExt};
@@ -103,7 +112,8 @@ pub fn build_router_with_auth(state: Arc<AppState>, auth_cfg: auth::AuthRuntimeC
         .route("/events", get(events))
         .route("/ws", get(ws_handler))
         .merge(protected)
-        .route("/grpc/contracts", get(grpc_contracts_markdown))
+        .route("/grpc/contracts", get(grpc_contracts))
+        .route("/grpc/contracts.md", get(grpc_contracts_markdown))
         .route(
             "/grpc/contracts/openapi.json",
             get(grpc_contracts_openapi_bridge),
@@ -293,6 +303,10 @@ fn ws_runtime_config() -> WsRuntimeConfig {
     }
 }
 
+async fn grpc_contracts() -> Html<&'static str> {
+    Html(grpc_contracts_html_document())
+}
+
 async fn grpc_contracts_markdown() -> ([(header::HeaderName, &'static str); 1], &'static str) {
     (
         [(header::CONTENT_TYPE, "text/markdown; charset=utf-8")],
@@ -310,6 +324,73 @@ async fn grpc_contracts_openapi_bridge() -> Result<Json<Value>, (StatusCode, Str
                 "internal server error".to_string(),
             )
         })
+}
+
+fn grpc_contracts_html_document() -> &'static str {
+    static PAGE: OnceLock<String> = OnceLock::new();
+    PAGE.get_or_init(|| {
+        let mut markdown_html = String::new();
+        let parser = Parser::new_ext(
+            grpc_contract_docs_markdown(),
+            Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS,
+        );
+        push_html(&mut markdown_html, parser);
+
+        format!(
+            r#"<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Alloy gRPC Contracts</title>
+    <style>
+      :root {{
+        color-scheme: light dark;
+      }}
+      body {{
+        margin: 0;
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }}
+      .container {{
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 24px;
+      }}
+      .links {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 20px;
+      }}
+      .links a {{
+        text-decoration: none;
+        font-weight: 600;
+      }}
+      pre {{
+        overflow-x: auto;
+        padding: 12px;
+        border-radius: 8px;
+      }}
+      code {{
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }}
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <nav class="links">
+        <a href="/grpc/contracts">Rendered gRPC Contracts</a>
+        <a href="/grpc/contracts.md">Raw Markdown</a>
+        <a href="/grpc/contracts/openapi.json">OpenAPI Bridge JSON</a>
+        <a href="/docs">REST Swagger UI</a>
+      </nav>
+      {markdown_html}
+    </main>
+  </body>
+</html>"#
+        )
+    })
 }
 
 fn map_error(err: AlloyError) -> (StatusCode, String) {
@@ -413,7 +494,7 @@ mod tests {
     #[tokio::test]
     async fn grpc_contract_docs_are_available() {
         let app = build_router(Arc::new(AppState::local("test-server")));
-        let markdown_response = app
+        let html_response = app
             .clone()
             .oneshot(
                 Request::builder()
@@ -422,14 +503,50 @@ mod tests {
                     .unwrap(),
             )
             .await
-            .expect("markdown request should succeed");
+            .expect("html request should succeed");
 
+        assert_eq!(html_response.status(), StatusCode::OK);
+        let html_content_type = html_response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("html content type should exist")
+            .to_str()
+            .expect("html content type value");
+        assert!(html_content_type.starts_with("text/html"));
+
+        let html_bytes = to_bytes(html_response.into_body(), usize::MAX)
+            .await
+            .expect("html body bytes");
+        let html_text = String::from_utf8(html_bytes.to_vec()).expect("valid html");
+        assert!(html_text.contains("<h1>gRPC Contract Documentation</h1>"));
+        assert!(html_text.contains("/grpc/contracts.md"));
+        assert!(html_text.contains("/grpc/contracts/openapi.json"));
+        assert!(html_text.contains("/docs"));
+
+        let markdown_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/grpc/contracts.md")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("markdown request should succeed");
         assert_eq!(markdown_response.status(), StatusCode::OK);
+        let markdown_content_type = markdown_response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .expect("markdown content type should exist")
+            .to_str()
+            .expect("markdown content type value");
+        assert!(markdown_content_type.starts_with("text/markdown"));
+
         let markdown_bytes = to_bytes(markdown_response.into_body(), usize::MAX)
             .await
             .expect("markdown body bytes");
         let markdown_text = String::from_utf8(markdown_bytes.to_vec()).expect("valid markdown");
-        assert!(markdown_text.contains("gRPC Contract Documentation"));
+        assert!(markdown_text.contains("# gRPC Contract Documentation"));
 
         let json_response = app
             .oneshot(

@@ -11,7 +11,8 @@ Alloy is a Rust server framework focused on **FastAPI-like developer ergonomics*
   - `/openapi.json`
   - `/docs`
 - gRPC contract bridge docs:
-  - `/grpc/contracts`
+  - `/grpc/contracts` (rendered HTML)
+  - `/grpc/contracts.md` (raw markdown)
   - `/grpc/contracts/openapi.json`
 - REST SSE stream:
   - `/events`
@@ -65,7 +66,9 @@ Auth defaults:
 
 - Swagger UI: [http://127.0.0.1:3000/docs](http://127.0.0.1:3000/docs)
 - OpenAPI JSON: [http://127.0.0.1:3000/openapi.json](http://127.0.0.1:3000/openapi.json)
-- gRPC contracts: [http://127.0.0.1:3000/grpc/contracts](http://127.0.0.1:3000/grpc/contracts)
+- gRPC contracts (rendered): [http://127.0.0.1:3000/grpc/contracts](http://127.0.0.1:3000/grpc/contracts)
+- gRPC contracts (markdown): [http://127.0.0.1:3000/grpc/contracts.md](http://127.0.0.1:3000/grpc/contracts.md)
+- gRPC OpenAPI bridge: [http://127.0.0.1:3000/grpc/contracts/openapi.json](http://127.0.0.1:3000/grpc/contracts/openapi.json)
 
 ## Repository Layout
 

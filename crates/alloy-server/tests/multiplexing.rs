@@ -111,6 +111,39 @@ async fn serves_rest_and_grpc_on_single_port() {
         "application/json"
     );
 
+    let grpc_contracts_html_response = rest_client
+        .get(format!("{base_url}/grpc/contracts"))
+        .send()
+        .await
+        .expect("grpc contracts html should be reachable");
+    assert_eq!(grpc_contracts_html_response.status().as_u16(), 200);
+    let grpc_contracts_html_content_type = grpc_contracts_html_response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .expect("grpc contracts html content-type header")
+        .to_str()
+        .expect("grpc contracts html content-type value");
+    assert!(grpc_contracts_html_content_type.starts_with("text/html"));
+    let grpc_contracts_html_body = grpc_contracts_html_response
+        .text()
+        .await
+        .expect("grpc contracts html body");
+    assert!(grpc_contracts_html_body.contains("/grpc/contracts/openapi.json"));
+
+    let grpc_contracts_markdown_response = rest_client
+        .get(format!("{base_url}/grpc/contracts.md"))
+        .send()
+        .await
+        .expect("grpc contracts markdown should be reachable");
+    assert_eq!(grpc_contracts_markdown_response.status().as_u16(), 200);
+    let grpc_contracts_markdown_content_type = grpc_contracts_markdown_response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .expect("grpc contracts markdown content-type header")
+        .to_str()
+        .expect("grpc contracts markdown content-type value");
+    assert!(grpc_contracts_markdown_content_type.starts_with("text/markdown"));
+
     let grpc_bridge_response = rest_client
         .get(format!("{base_url}/grpc/contracts/openapi.json"))
         .send()
