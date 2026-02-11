@@ -21,19 +21,40 @@ fn descriptor_docgen_supports_complex_protobuf_features() {
         .status()
         .expect("run grpc-docgen");
 
-    assert!(status.success(), "grpc-docgen must succeed for fixture proto");
+    assert!(
+        status.success(),
+        "grpc-docgen must succeed for fixture proto"
+    );
 
     let md = std::fs::read_to_string(&out_md).expect("read markdown");
     assert!(
         md.contains("Oneof groups:"),
         "markdown should document oneof groups"
     );
-    assert!(md.contains("fixture.common.v1.CommonMeta"), "markdown should include imported message types");
-    assert!(md.contains("fixture.docs.v1.GetDocRequest.NestedInfo.Scope"), "markdown should include nested enums");
+    assert!(
+        md.contains("fixture.common.v1.CommonMeta"),
+        "markdown should include imported message types"
+    );
+    assert!(
+        md.contains("fixture.docs.v1.GetDocRequest.NestedInfo.Scope"),
+        "markdown should include nested enums"
+    );
 
     let json = std::fs::read_to_string(&out_openapi).expect("read openapi bridge");
-    assert!(json.contains("/fixture.docs.v1.DocsService/GetDoc"), "openapi bridge must include grpc method path");
-    assert!(json.contains("x-alloy-oneof"), "openapi bridge should expose oneof group metadata");
-    assert!(json.contains("x-alloy-map"), "openapi bridge should mark map fields");
-    assert!(json.contains("fixture.common.v1.CommonMeta"), "openapi bridge should reference imported message schemas");
+    assert!(
+        json.contains("/fixture.docs.v1.DocsService/GetDoc"),
+        "openapi bridge must include grpc method path"
+    );
+    assert!(
+        json.contains("x-alloy-oneof"),
+        "openapi bridge should expose oneof group metadata"
+    );
+    assert!(
+        json.contains("x-alloy-map"),
+        "openapi bridge should mark map fields"
+    );
+    assert!(
+        json.contains("fixture.common.v1.CommonMeta"),
+        "openapi bridge should reference imported message schemas"
+    );
 }

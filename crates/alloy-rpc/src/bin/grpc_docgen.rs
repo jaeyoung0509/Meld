@@ -112,7 +112,9 @@ fn parse_args(
     Ok(cfg)
 }
 
-fn compile_descriptor_set(config: &Config) -> Result<FileDescriptorSet, Box<dyn std::error::Error>> {
+fn compile_descriptor_set(
+    config: &Config,
+) -> Result<FileDescriptorSet, Box<dyn std::error::Error>> {
     let protoc = protoc_bin_vendored::protoc_bin_path()?;
     let tmp = tempfile::NamedTempFile::new()?;
 
@@ -156,7 +158,10 @@ fn build_index(descriptor_set: &FileDescriptorSet) -> DescriptorIndex {
         }
 
         for service in &file.service {
-            let full = qualify(&package, service.name.as_deref().unwrap_or("UnknownService"));
+            let full = qualify(
+                &package,
+                service.name.as_deref().unwrap_or("UnknownService"),
+            );
             services.insert(full, service.clone());
         }
     }
@@ -307,7 +312,12 @@ fn message_schema(name: &str, message: &DescriptorProto, index: &DescriptorIndex
         .oneof_decl
         .iter()
         .enumerate()
-        .map(|(idx, oneof)| (idx as i32, oneof.name.clone().unwrap_or_else(|| format!("oneof_{idx}"))))
+        .map(|(idx, oneof)| {
+            (
+                idx as i32,
+                oneof.name.clone().unwrap_or_else(|| format!("oneof_{idx}")),
+            )
+        })
         .collect();
 
     let mut props = BTreeMap::<String, Value>::new();
@@ -315,7 +325,10 @@ fn message_schema(name: &str, message: &DescriptorProto, index: &DescriptorIndex
     let mut oneof_map = BTreeMap::<String, Vec<String>>::new();
 
     for field in &message.field {
-        let field_name = field.name.clone().unwrap_or_else(|| "unknown_field".to_string());
+        let field_name = field
+            .name
+            .clone()
+            .unwrap_or_else(|| "unknown_field".to_string());
 
         if field.label == Some(Label::Required as i32) {
             required.push(field_name.clone());
@@ -414,11 +427,7 @@ fn base_schema(field: &FieldDescriptorProto, index: &DescriptorIndex) -> Value {
         Type::Enum => {
             let enum_name = normalize_type_name(field.type_name.as_deref().unwrap_or(""));
             if let Some(en) = index.enums.get(&enum_name) {
-                let values: Vec<String> = en
-                    .value
-                    .iter()
-                    .filter_map(|v| v.name.clone())
-                    .collect();
+                let values: Vec<String> = en.value.iter().filter_map(|v| v.name.clone()).collect();
                 json!({"type": "string", "enum": values})
             } else {
                 json!({"type": "string"})
@@ -441,16 +450,19 @@ fn is_map_entry(message: &DescriptorProto) -> bool {
 }
 
 fn build_markdown(index: &DescriptorIndex) -> String {
-    let mut lines = Vec::<String>::new();
-    lines.push("# gRPC Contract Documentation".to_string());
-    lines.push(String::new());
-    lines.push("Generated from protobuf descriptor set (descriptor-based parser).".to_string());
-    lines.push(String::new());
-
-    lines.push("## Packages".to_string());
-    lines.push(String::new());
+    let mut lines = vec![
+        "# gRPC Contract Documentation".to_string(),
+        String::new(),
+        "Generated from protobuf descriptor set (descriptor-based parser).".to_string(),
+        String::new(),
+        "## Packages".to_string(),
+        String::new(),
+    ];
     for pkg in index.packages.keys() {
-        lines.push(format!("- `{}`", if pkg.is_empty() { "<root>" } else { pkg }));
+        lines.push(format!(
+            "- `{}`",
+            if pkg.is_empty() { "<root>" } else { pkg }
+        ));
     }
     lines.push(String::new());
 
@@ -503,10 +515,7 @@ fn build_markdown(index: &DescriptorIndex) -> String {
             lines.push(String::new());
             lines.push("Oneof groups:".to_string());
             for (idx, oneof) in message.oneof_decl.iter().enumerate() {
-                let group_name = oneof
-                    .name
-                    .clone()
-                    .unwrap_or_else(|| format!("oneof_{idx}"));
+                let group_name = oneof.name.clone().unwrap_or_else(|| format!("oneof_{idx}"));
                 let fields: Vec<String> = message
                     .field
                     .iter()
@@ -523,11 +532,7 @@ fn build_markdown(index: &DescriptorIndex) -> String {
     lines.push("## Enums".to_string());
     lines.push(String::new());
     for (enum_name, en) in &index.enums {
-        let values: Vec<String> = en
-            .value
-            .iter()
-            .filter_map(|v| v.name.clone())
-            .collect();
+        let values: Vec<String> = en.value.iter().filter_map(|v| v.name.clone()).collect();
         lines.push(format!("- `{enum_name}`: {}", values.join(", ")));
     }
     lines.push(String::new());

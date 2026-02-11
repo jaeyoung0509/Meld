@@ -55,6 +55,12 @@ WebSocket defaults:
 - max text frame: `4096` bytes (`ALLOY_WS_MAX_TEXT_BYTES`)
 - idle timeout: `45` seconds (`ALLOY_WS_IDLE_TIMEOUT_SECS`)
 
+Middleware defaults:
+- request timeout: `15` seconds (`ALLOY_TIMEOUT_SECONDS`)
+- max in-flight requests: `1024` (`ALLOY_MAX_IN_FLIGHT_REQUESTS`)
+- request body limit: `1048576` bytes (`ALLOY_REQUEST_BODY_LIMIT_BYTES`)
+- CORS: disabled by default; set `ALLOY_CORS_ALLOW_ORIGINS` to a comma-separated allowlist (use `*` only when you intentionally want wildcard CORS)
+
 Auth defaults:
 - disabled by default (`ALLOY_AUTH_ENABLED=false`)
 - when enabled, JWT HMAC secret required (`ALLOY_AUTH_JWT_SECRET`)
