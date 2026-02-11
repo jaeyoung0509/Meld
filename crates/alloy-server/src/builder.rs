@@ -176,7 +176,12 @@ mod tests {
     async fn builder_creates_working_app() {
         let app = AlloyServer::new().build_app();
         let response = app
-            .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .expect("health request should succeed");
         assert_eq!(response.status(), StatusCode::OK);
@@ -188,9 +193,7 @@ mod tests {
         let app = AlloyServer::new()
             .without_grpc()
             .with_rest_router(custom_router)
-            .with_middleware(|router| {
-                router.route("/ping", get(|| async { "pong" }))
-            })
+            .with_middleware(|router| router.route("/ping", get(|| async { "pong" })))
             .build_app();
 
         let ping_response = app

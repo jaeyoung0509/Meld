@@ -12,23 +12,12 @@ use tonic::Status;
 
 use crate::api::ApiErrorResponse;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AuthRuntimeConfig {
     pub enabled: bool,
     pub jwt_secret: Option<String>,
     pub expected_issuer: Option<String>,
     pub expected_audience: Option<String>,
-}
-
-impl Default for AuthRuntimeConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            jwt_secret: None,
-            expected_issuer: None,
-            expected_audience: None,
-        }
-    }
 }
 
 impl AuthRuntimeConfig {

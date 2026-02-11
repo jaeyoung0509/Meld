@@ -1,0 +1,7 @@
+[advisories]
+ignore = [
+  # jsonwebtoken pulls rsa transitively for asymmetric JWT algorithms.
+  # Alloy currently validates HS256 (HMAC) tokens only, so this advisory is
+  # not exploitable in our runtime path.
+  "RUSTSEC-2023-0071",
+]

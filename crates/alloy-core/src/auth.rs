@@ -61,6 +61,7 @@ pub fn validate_bearer_jwt(
 ) -> Result<AuthPrincipal, AuthError> {
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = true;
+    validation.validate_aud = false;
     validation
         .required_spec_claims
         .extend(["sub".to_string(), "exp".to_string()]);

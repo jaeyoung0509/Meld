@@ -1,7 +1,5 @@
 use alloy_core::AppState;
-use alloy_rpc::{
-    build_hello_response, Greeter, GreeterServer, HelloRequest, HelloResponse,
-};
+use alloy_rpc::{build_hello_response, Greeter, GreeterServer, HelloRequest, HelloResponse};
 use tonic::{Request, Response, Status};
 
 #[derive(Default)]
