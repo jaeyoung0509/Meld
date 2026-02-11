@@ -3,11 +3,12 @@ use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 use alloy_core::AppState;
 use alloy_server::{
     api::{bad_request, ApiError},
+    di::Depends,
     AlloyServer,
 };
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
-    extract::{FromRequestParts, Path, State},
+    extract::{FromRef, FromRequestParts, Path, State},
     http::request::Parts,
     response::sse::{Event, KeepAlive, Sse},
     routing::get,
@@ -41,6 +42,7 @@ struct NoteResponse {
     id: String,
     title: String,
     request_id: Option<String>,
+    service_name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -59,6 +61,19 @@ struct NoteEventPayload {
 #[derive(Debug, Clone)]
 struct RequestContext {
     request_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct ServiceInfo {
+    service_name: String,
+}
+
+impl FromRef<Arc<AppState>> for ServiceInfo {
+    fn from_ref(state: &Arc<AppState>) -> Self {
+        Self {
+            service_name: state.config.service_name.clone(),
+        }
+    }
 }
 
 #[axum::async_trait]
@@ -80,6 +95,7 @@ where
 
 async fn get_note(
     ctx: RequestContext,
+    Depends(service): Depends<ServiceInfo>,
     State(state): State<Arc<AppState>>,
     Path(path): Path<NotePath>,
 ) -> Result<Json<NoteResponse>, ApiError> {
@@ -90,6 +106,7 @@ async fn get_note(
         id: path.id,
         title,
         request_id: ctx.request_id,
+        service_name: service.service_name,
     }))
 }
 
@@ -104,11 +121,16 @@ async fn list_notes(
 }
 
 #[alloy_server::route(post, "/notes", auto_validate)]
-async fn create_note(ctx: RequestContext, Json(body): Json<CreateNoteBody>) -> Json<NoteResponse> {
+async fn create_note(
+    ctx: RequestContext,
+    Depends(service): Depends<ServiceInfo>,
+    Json(body): Json<CreateNoteBody>,
+) -> Json<NoteResponse> {
     Json(NoteResponse {
         id: "note-1".to_string(),
         title: body.title,
         request_id: ctx.request_id,
+        service_name: service.service_name,
     })
 }
 
@@ -118,6 +140,7 @@ async fn create_note_raw(Json(body): Json<CreateNoteBody>) -> Json<NoteResponse>
         id: "note-raw".to_string(),
         title: body.title,
         request_id: None,
+        service_name: "raw".to_string(),
     })
 }
 
@@ -306,6 +329,7 @@ mod tests {
         let parsed: NoteResponse = serde_json::from_slice(&body).expect("note json");
         assert_eq!(parsed.title, "My Note");
         assert_eq!(parsed.request_id.as_deref(), Some("req-1"));
+        assert_eq!(parsed.service_name, "simple-server-test");
     }
 
     #[tokio::test]

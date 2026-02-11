@@ -26,6 +26,7 @@ use utoipa_swagger_ui::SwaggerUi;
 pub mod api;
 pub mod auth;
 pub mod builder;
+pub mod di;
 pub mod grpc;
 pub mod middleware;
 pub use alloy_macros::route;

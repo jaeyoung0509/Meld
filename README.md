@@ -21,6 +21,8 @@ Alloy is a Rust server framework focused on **FastAPI-like developer ergonomics*
   - `/protected/whoami`
 - Fluent server builder API:
   - `AlloyServer::new().with_...().run()`
+- Depends-style DI extractor with request cache:
+  - `alloy_server::di::Depends<T>`
 - Shared middleware stack:
   - tracing, request-id propagation, CORS, timeout, concurrency limit
 
