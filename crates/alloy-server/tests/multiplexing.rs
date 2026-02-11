@@ -2,12 +2,17 @@ use std::sync::Arc;
 
 use alloy_core::AppState;
 use alloy_rpc::{GreeterClient, HelloRequest};
-use alloy_server::{build_multiplexed_router, middleware};
+use alloy_server::{
+    auth::AuthRuntimeConfig, build_multiplexed_router, build_multiplexed_router_with_auth,
+    middleware,
+};
 use axum::http::header;
 use futures_util::{SinkExt, StreamExt};
+use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio_tungstenite::tungstenite::Message;
+use tonic::metadata::MetadataValue;
 
 #[tokio::test]
 async fn serves_rest_and_grpc_on_single_port() {
@@ -147,6 +152,88 @@ async fn serves_rest_and_grpc_on_single_port() {
         .into_inner();
 
     assert_eq!(grpc_response.message, "Hello, Rust!");
+
+    let _ = shutdown_tx.send(());
+    let _ = server.await;
+}
+
+#[derive(serde::Serialize)]
+struct TestClaims {
+    sub: String,
+    exp: usize,
+    iss: String,
+    aud: String,
+}
+
+fn issue_test_token(secret: &str) -> String {
+    encode(
+        &Header::new(Algorithm::HS256),
+        &TestClaims {
+            sub: "user-1".to_string(),
+            exp: 4_102_444_800,
+            iss: "https://issuer.local".to_string(),
+            aud: "alloy-api".to_string(),
+        },
+        &EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .expect("token should encode")
+}
+
+#[tokio::test]
+async fn grpc_auth_interceptor_rejects_missing_token_and_accepts_valid_token() {
+    let state = Arc::new(AppState::local("multiplexing-auth-test"));
+    let auth_cfg = AuthRuntimeConfig {
+        enabled: true,
+        jwt_secret: Some("dev-secret".to_string()),
+        expected_issuer: Some("https://issuer.local".to_string()),
+        expected_audience: Some("alloy-api".to_string()),
+    };
+    let app = middleware::apply_shared_middleware(
+        build_multiplexed_router_with_auth(state, auth_cfg),
+        &middleware::MiddlewareConfig::default(),
+    );
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind test listener");
+    let addr = listener.local_addr().expect("listener addr");
+
+    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async {
+                let _ = shutdown_rx.await;
+            })
+            .await
+            .expect("server should run");
+    });
+
+    let base_url = format!("http://{addr}");
+    let mut grpc_client = GreeterClient::connect(base_url.clone())
+        .await
+        .expect("grpc client connect");
+
+    let missing = grpc_client
+        .say_hello(tonic::Request::new(HelloRequest {
+            name: "Rust".to_string(),
+        }))
+        .await
+        .expect_err("missing token should fail");
+    assert_eq!(missing.code(), tonic::Code::Unauthenticated);
+
+    let token = issue_test_token("dev-secret");
+    let mut request = tonic::Request::new(HelloRequest {
+        name: "Rust".to_string(),
+    });
+    request.metadata_mut().insert(
+        "authorization",
+        MetadataValue::try_from(format!("Bearer {token}")).expect("metadata value"),
+    );
+    let response = grpc_client
+        .say_hello(request)
+        .await
+        .expect("valid token should succeed")
+        .into_inner();
+    assert_eq!(response.message, "Hello, Rust!");
 
     let _ = shutdown_tx.send(());
     let _ = server.await;

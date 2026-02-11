@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
+pub mod auth;
+
 pub type AlloyResult<T> = Result<T, AlloyError>;
 
 #[derive(Debug, Clone)]

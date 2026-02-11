@@ -19,6 +19,7 @@ tokio-stream = "0.1"
 futures-util = "0.3"
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 serde = { version = "1", features = ["derive"] }
+jsonwebtoken = "8.3"
 thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }

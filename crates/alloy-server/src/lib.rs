@@ -8,9 +8,10 @@ use alloy_rpc::{
 };
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::header,
     http::StatusCode,
+    middleware::from_fn_with_state,
     response::sse::{Event, KeepAlive, Sse},
     routing::get,
     Json, Router,
@@ -23,6 +24,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 pub mod api;
+pub mod auth;
 pub mod builder;
 pub mod grpc;
 pub mod middleware;
@@ -45,6 +47,12 @@ pub struct HelloRestResponse {
     pub message: String,
 }
 
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct ProtectedWhoAmIResponse {
+    pub subject: String,
+    pub issuer: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 struct ServerSentEventPayload {
     sequence: u64,
@@ -54,8 +62,13 @@ struct ServerSentEventPayload {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(root, health, hello),
-    components(schemas(RootResponse, HealthResponse, HelloRestResponse)),
+    paths(root, health, hello, protected_whoami),
+    components(schemas(
+        RootResponse,
+        HealthResponse,
+        HelloRestResponse,
+        ProtectedWhoAmIResponse
+    )),
     tags(
         (name = "rest", description = "Alloy REST endpoints")
     )
@@ -63,12 +76,21 @@ struct ServerSentEventPayload {
 struct ApiDoc;
 
 pub fn build_router(state: Arc<AppState>) -> Router {
+    build_router_with_auth(state, auth::AuthRuntimeConfig::from_env())
+}
+
+pub fn build_router_with_auth(state: Arc<AppState>, auth_cfg: auth::AuthRuntimeConfig) -> Router {
+    let protected = Router::new()
+        .route("/protected/whoami", get(protected_whoami))
+        .route_layer(from_fn_with_state(auth_cfg, auth::rest_auth_middleware));
+
     Router::new()
         .route("/", get(root))
         .route("/health", get(health))
         .route("/hello/:name", get(hello))
         .route("/events", get(events))
         .route("/ws", get(ws_handler))
+        .merge(protected)
         .route("/grpc/contracts", get(grpc_contracts_markdown))
         .route(
             "/grpc/contracts/openapi.json",
@@ -79,8 +101,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 }
 
 pub fn build_multiplexed_router(state: Arc<AppState>) -> Router {
-    let rest = build_router(state.clone());
-    let grpc = Routes::new(grpc::build_grpc_service(state))
+    build_multiplexed_router_with_auth(state, auth::AuthRuntimeConfig::from_env())
+}
+
+pub fn build_multiplexed_router_with_auth(
+    state: Arc<AppState>,
+    auth_cfg: auth::AuthRuntimeConfig,
+) -> Router {
+    let rest = build_router_with_auth(state.clone(), auth_cfg.clone());
+    let grpc = Routes::new(grpc::build_grpc_service_with_auth(state, auth_cfg))
         .prepare()
         .into_axum_router();
 
@@ -138,6 +167,24 @@ async fn hello(
     Ok(Json(HelloRestResponse {
         message: response.message,
     }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/protected/whoami",
+    tag = "rest",
+    responses(
+        (status = 200, description = "Authenticated principal", body = ProtectedWhoAmIResponse),
+        (status = 401, description = "Unauthorized")
+    )
+)]
+async fn protected_whoami(
+    Extension(principal): Extension<alloy_core::auth::AuthPrincipal>,
+) -> Json<ProtectedWhoAmIResponse> {
+    Json(ProtectedWhoAmIResponse {
+        subject: principal.subject,
+        issuer: principal.issuer,
+    })
 }
 
 async fn events(
@@ -303,7 +350,9 @@ fn build_sse_event(sequence: u64, kind: &'static str, service_name: &str) -> Eve
 mod tests {
     use super::*;
     use axum::body::to_bytes;
-    use axum::http::{Request, StatusCode};
+    use axum::http::{header::AUTHORIZATION, HeaderValue, Request, StatusCode};
+    use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+    use serde::Serialize;
     use tokio::time::{timeout, Duration};
     use tokio_stream::StreamExt;
     use tower::util::ServiceExt;
@@ -417,5 +466,87 @@ mod tests {
         let first_text = String::from_utf8(first_chunk.to_vec()).expect("utf8 chunk");
         assert!(first_text.contains("event: heartbeat"));
         assert!(first_text.contains("\"kind\":\"heartbeat\""));
+    }
+
+    #[derive(Serialize)]
+    struct TestClaims {
+        sub: String,
+        exp: usize,
+        iss: String,
+        aud: String,
+    }
+
+    fn issue_test_token(secret: &str) -> String {
+        encode(
+            &Header::new(Algorithm::HS256),
+            &TestClaims {
+                sub: "user-123".to_string(),
+                exp: 4_102_444_800,
+                iss: "https://issuer.local".to_string(),
+                aud: "alloy-api".to_string(),
+            },
+            &EncodingKey::from_secret(secret.as_bytes()),
+        )
+        .expect("token should encode")
+    }
+
+    #[tokio::test]
+    async fn protected_route_rejects_missing_token_when_auth_enabled() {
+        let app = build_router_with_auth(
+            Arc::new(AppState::local("test-server")),
+            auth::AuthRuntimeConfig {
+                enabled: true,
+                jwt_secret: Some("dev-secret".to_string()),
+                expected_issuer: Some("https://issuer.local".to_string()),
+                expected_audience: Some("alloy-api".to_string()),
+            },
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/protected/whoami")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("request should succeed");
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn protected_route_accepts_valid_token_when_auth_enabled() {
+        let secret = "dev-secret";
+        let token = issue_test_token(secret);
+        let app = build_router_with_auth(
+            Arc::new(AppState::local("test-server")),
+            auth::AuthRuntimeConfig {
+                enabled: true,
+                jwt_secret: Some(secret.to_string()),
+                expected_issuer: Some("https://issuer.local".to_string()),
+                expected_audience: Some("alloy-api".to_string()),
+            },
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/protected/whoami")
+                    .header(
+                        AUTHORIZATION,
+                        HeaderValue::from_str(&format!("Bearer {token}")).expect("header value"),
+                    )
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("request should succeed");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body bytes");
+        let body_text = String::from_utf8(bytes.to_vec()).expect("utf8");
+        assert!(body_text.contains("user-123"));
     }
 }
