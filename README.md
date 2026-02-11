@@ -142,16 +142,6 @@ This runs:
 - gRPC docs drift check
 - OpenAPI route check
 
-## Rebrand Compatibility (Alloy -> Meld)
-
-- Crate names are now `meld-core`, `meld-rpc`, `meld-server`, `meld-macros`.
-- gRPC package/contract namespace is now `meld.v1` and bridge keys use `x-meld-*`.
-- New runtime env vars use `MELD_*`.
-- Backward-compatibility is kept for transition:
-  - legacy `ALLOY_*` env vars are still read as fallback when matching `MELD_*` vars are unset
-  - type aliases like `AlloyServer`/`AlloyError` are still exported
-  - macro crate resolution accepts both `meld-server` and legacy `alloy-server`
-
 ## Current Status
 
 Core roadmap items are implemented:
