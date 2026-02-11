@@ -11,6 +11,7 @@ use axum::{
 use tonic::service::Routes;
 
 pub mod grpc;
+pub mod middleware;
 
 pub fn build_router(state: Arc<AppState>) -> Router {
     Router::new()
