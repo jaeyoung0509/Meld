@@ -61,6 +61,9 @@ Auth defaults:
 - optional issuer/audience checks:
   - `ALLOY_AUTH_ISSUER`
   - `ALLOY_AUTH_AUDIENCE`
+- `/protected/whoami` behavior:
+  - auth disabled: returns `200` with anonymous principal
+  - auth enabled: requires bearer JWT and returns `401` when missing/invalid
 
 ### 3) Open docs
 
