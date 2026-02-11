@@ -149,7 +149,7 @@ that implements `Validate`.
 
 Macro portability:
 - `#[route(...)]` expansion is dependency-rename safe.
-- Example compile coverage exists under `examples/renamed-meld-app`.
+- Example compile coverage exists under `examples/meld-app`.
 
 ## SSE Endpoint Pattern
 
@@ -265,3 +265,78 @@ Test override helper:
 
 - Default `MeldServer::new()` enables both REST and gRPC on a single listener.
 - Default address uses `MELD_SERVER_ADDR` if set, otherwise `127.0.0.1:3000`.
+
+## gRPC Quickstart (No-Auth + Auth)
+
+Prerequisites:
+- `grpcurl` for local gRPC calls
+- `python3` for dev-token generation script
+
+Start server (default no-auth):
+
+```bash
+cargo run -p meld-server
+```
+
+No-auth smoke tests:
+
+```bash
+grpcurl -plaintext 127.0.0.1:3000 list
+grpcurl -plaintext \
+  -import-path crates/meld-rpc/proto \
+  -proto service.proto \
+  -d '{"name":"Rust"}' \
+  127.0.0.1:3000 \
+  meld.v1.Greeter/SayHello
+```
+
+Enable auth (restart server):
+
+```bash
+MELD_AUTH_ENABLED=true \
+MELD_AUTH_JWT_SECRET=dev-secret \
+MELD_AUTH_ISSUER=https://issuer.local \
+MELD_AUTH_AUDIENCE=meld-api \
+cargo run -p meld-server
+```
+
+Expected failure without token:
+
+```bash
+grpcurl -plaintext \
+  -import-path crates/meld-rpc/proto \
+  -proto service.proto \
+  -d '{"name":"Rust"}' \
+  127.0.0.1:3000 \
+  meld.v1.Greeter/SayHello
+```
+
+Expected outcome:
+- gRPC status code: `UNAUTHENTICATED`
+- Typical message: `missing bearer token`
+
+Generate a development token (dev-only helper):
+
+```bash
+TOKEN=$(python3 scripts/generate_dev_jwt.py \
+  --secret dev-secret \
+  --issuer https://issuer.local \
+  --audience meld-api)
+```
+
+Expected success with token:
+
+```bash
+grpcurl -plaintext \
+  -H "authorization: Bearer ${TOKEN}" \
+  -import-path crates/meld-rpc/proto \
+  -proto service.proto \
+  -d '{"name":"Rust"}' \
+  127.0.0.1:3000 \
+  meld.v1.Greeter/SayHello
+```
+
+Common auth mismatch outcomes:
+- wrong `--secret` / `MELD_AUTH_JWT_SECRET`: `UNAUTHENTICATED`
+- wrong `--issuer` / `MELD_AUTH_ISSUER`: `UNAUTHENTICATED`
+- wrong `--audience` / `MELD_AUTH_AUDIENCE`: `UNAUTHENTICATED`

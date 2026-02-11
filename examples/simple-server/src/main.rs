@@ -158,7 +158,7 @@ fn note_event_stream() -> impl Stream<Item = Result<Event, Infallible>> {
     let mut sequence = 0u64;
     let ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(2))).map(move |_| {
         sequence += 1;
-        let kind = if sequence % 5 == 0 {
+        let kind = if sequence.checked_rem(5) == Some(0) {
             "heartbeat"
         } else {
             "note"

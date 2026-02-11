@@ -28,7 +28,6 @@ use pulldown_cmark::{html::push_html, Options, Parser};
 use serde::Serialize;
 use serde_json::Value;
 use tokio_stream::{once, wrappers::IntervalStream, Stream, StreamExt};
-use tonic::service::Routes;
 use utoipa::{
     openapi::{
         path::{HttpMethod, Operation, PathItem},
@@ -239,9 +238,7 @@ pub fn build_multiplexed_router_with_auth(
     auth_cfg: auth::AuthRuntimeConfig,
 ) -> Router {
     let rest = build_router_with_auth(state.clone(), auth_cfg.clone());
-    let grpc = Routes::new(grpc::build_grpc_service_with_auth(state, auth_cfg))
-        .prepare()
-        .into_axum_router();
+    let grpc = grpc::build_grpc_routes_with_auth(state, auth_cfg).into_axum_router();
 
     rest.merge(grpc)
 }

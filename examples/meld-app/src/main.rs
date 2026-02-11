@@ -52,7 +52,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn renamed_dependency_macro_validates_path() {
+    async fn dependency_macro_validates_path() {
         let response = app()
             .oneshot(
                 Request::builder()

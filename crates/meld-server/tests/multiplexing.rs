@@ -264,6 +264,7 @@ async fn grpc_auth_interceptor_rejects_missing_token_and_accepts_valid_token() {
         .await
         .expect_err("missing token should fail");
     assert_eq!(missing.code(), tonic::Code::Unauthenticated);
+    assert_eq!(missing.message(), "missing bearer token");
 
     let token = issue_test_token("dev-secret");
     let mut request = tonic::Request::new(HelloRequest {

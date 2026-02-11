@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use crate::auth::AuthRuntimeConfig;
 use meld_core::AppState;
-use meld_rpc::{build_hello_response, Greeter, GreeterServer, HelloRequest, HelloResponse};
+use meld_rpc::{
+    build_hello_response, Greeter, GreeterServer, HelloRequest, HelloResponse, FILE_DESCRIPTOR_SET,
+};
+use tonic::service::Routes;
 use tonic::{service::interceptor::InterceptedService, Request, Response, Status};
 
 #[derive(Clone)]
@@ -40,6 +43,26 @@ pub fn build_grpc_service_with_auth(
 ) -> InterceptedService<GreeterServer<GreeterService>, GrpcAuthInterceptor> {
     let service = GreeterServer::new(GreeterService::new(state));
     InterceptedService::new(service, GrpcAuthInterceptor { auth_cfg })
+}
+
+pub fn build_grpc_routes(state: Arc<AppState>) -> Routes {
+    build_grpc_routes_with_auth(state, AuthRuntimeConfig::from_env())
+}
+
+pub fn build_grpc_routes_with_auth(state: Arc<AppState>, auth_cfg: AuthRuntimeConfig) -> Routes {
+    let reflection_v1 = tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
+        .build_v1()
+        .expect("reflection service (v1) should build");
+    let reflection_v1alpha = tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
+        .build_v1alpha()
+        .expect("reflection service (v1alpha) should build");
+
+    Routes::new(build_grpc_service_with_auth(state, auth_cfg))
+        .add_service(reflection_v1)
+        .add_service(reflection_v1alpha)
+        .prepare()
 }
 
 fn map_error(err: meld_core::MeldError) -> Status {

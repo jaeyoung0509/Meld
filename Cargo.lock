@@ -1114,6 +1114,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
 
 [[package]]
+name = "meld-app"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "meld-server",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower 0.5.3",
+ "utoipa",
+ "validator",
+]
+
+[[package]]
 name = "meld-core"
 version = "0.1.0"
 dependencies = [
@@ -1165,6 +1179,7 @@ dependencies = [
  "tokio-stream",
  "tokio-tungstenite",
  "tonic",
+ "tonic-reflection",
  "tower 0.5.3",
  "tower-http 0.5.2",
  "tracing",
@@ -1787,20 +1802,6 @@ name = "regex-syntax"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a96887878f22d7bad8a3b6dc5b7440e0ada9a245242924394987b21cf2210a4c"
-
-[[package]]
-name = "renamed-meld-app"
-version = "0.1.0"
-dependencies = [
- "axum",
- "meld-server",
- "serde",
- "serde_json",
- "tokio",
- "tower 0.5.3",
- "utoipa",
- "validator",
-]
 
 [[package]]
 name = "reqwest"
@@ -2509,6 +2510,19 @@ dependencies = [
  "prost-types",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tonic-reflection"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "878d81f52e7fcfd80026b7fdb6a9b578b3c3653ba987f87f0dce4b64043cba27"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tokio",
+ "tokio-stream",
+ "tonic",
 ]
 
 [[package]]

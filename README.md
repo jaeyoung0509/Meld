@@ -30,7 +30,7 @@ Meld is a Rust server framework focused on **FastAPI-like developer ergonomics**
 - Shared middleware stack:
   - tracing, request-id propagation, CORS, timeout, concurrency limit
 
-## Quick Start (5 Minutes)
+## Quick Start (7 Minutes)
 
 ### 1) Start the default server
 
@@ -74,7 +74,65 @@ Auth defaults:
   - auth disabled: returns `200` with anonymous principal
   - auth enabled: requires bearer JWT and returns `401` when missing/invalid
 
-### 3) Open docs
+### 3) Verify gRPC (auth disabled)
+
+`grpcurl` is required for gRPC smoke tests.
+
+```bash
+grpcurl -plaintext 127.0.0.1:3000 list
+grpcurl -plaintext \
+  -import-path crates/meld-rpc/proto \
+  -proto service.proto \
+  -d '{"name":"Rust"}' \
+  127.0.0.1:3000 \
+  meld.v1.Greeter/SayHello
+```
+
+### 4) Verify gRPC (auth enabled)
+
+Restart server with auth enabled:
+
+```bash
+MELD_AUTH_ENABLED=true \
+MELD_AUTH_JWT_SECRET=dev-secret \
+MELD_AUTH_ISSUER=https://issuer.local \
+MELD_AUTH_AUDIENCE=meld-api \
+cargo run -p meld-server
+```
+
+Call without token (expected: `UNAUTHENTICATED`):
+
+```bash
+grpcurl -plaintext \
+  -import-path crates/meld-rpc/proto \
+  -proto service.proto \
+  -d '{"name":"Rust"}' \
+  127.0.0.1:3000 \
+  meld.v1.Greeter/SayHello
+```
+
+Generate a dev token (development only):
+
+```bash
+TOKEN=$(python3 scripts/generate_dev_jwt.py \
+  --secret dev-secret \
+  --issuer https://issuer.local \
+  --audience meld-api)
+```
+
+Call with token (expected: success):
+
+```bash
+grpcurl -plaintext \
+  -H "authorization: Bearer ${TOKEN}" \
+  -import-path crates/meld-rpc/proto \
+  -proto service.proto \
+  -d '{"name":"Rust"}' \
+  127.0.0.1:3000 \
+  meld.v1.Greeter/SayHello
+```
+
+### 5) Open docs
 
 - Swagger UI: [http://127.0.0.1:3000/docs](http://127.0.0.1:3000/docs)
 - OpenAPI JSON: [http://127.0.0.1:3000/openapi.json](http://127.0.0.1:3000/openapi.json)
@@ -89,7 +147,7 @@ crates/meld-core     # domain, state, error model
 crates/meld-rpc      # proto, tonic codegen, grpc-docgen tool
 crates/meld-server   # REST + gRPC routing, middleware, builder API
 examples/simple-server
-examples/renamed-meld-app
+examples/meld-app
 docs/
 scripts/
 ```
@@ -114,8 +172,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 See:
 - `docs/fastapi-like-builder.md`
 - `docs/dx-scorecard.md`
+- `examples/simple-server/README.md`
 - `examples/simple-server/src/main.rs`
-- `examples/renamed-meld-app/src/main.rs` (dependency-rename-safe macro usage)
+- `examples/meld-app/src/main.rs` (dependency-rename-safe macro usage)
 
 ## gRPC Contract Doc Generation
 

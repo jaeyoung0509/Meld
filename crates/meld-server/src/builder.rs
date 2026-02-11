@@ -29,7 +29,7 @@ impl MeldServer {
     pub fn new() -> Self {
         let state = Arc::new(AppState::local("meld-server"));
         Self {
-            grpc_routes: Some(Routes::new(grpc::build_grpc_service(state.clone())).prepare()),
+            grpc_routes: Some(grpc::build_grpc_routes(state.clone())),
             state,
             addr: load_addr_from_env().unwrap_or(SocketAddr::from(([127, 0, 0, 1], 3000))),
             rest_router: None,
