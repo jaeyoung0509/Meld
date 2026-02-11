@@ -1,41 +1,41 @@
 {
   "components": {
     "schemas": {
-      "alloy.v1.HelloRequest": {
+      "meld.v1.HelloRequest": {
         "properties": {
           "name": {
             "type": "string"
           }
         },
         "type": "object",
-        "x-alloy-message": "alloy.v1.HelloRequest"
+        "x-meld-message": "meld.v1.HelloRequest"
       },
-      "alloy.v1.HelloResponse": {
+      "meld.v1.HelloResponse": {
         "properties": {
           "message": {
             "type": "string"
           }
         },
         "type": "object",
-        "x-alloy-message": "alloy.v1.HelloResponse"
+        "x-meld-message": "meld.v1.HelloResponse"
       }
     }
   },
   "info": {
     "description": "Swagger-compatible contract view generated from protobuf descriptors.",
-    "title": "Alloy gRPC Contract Bridge",
+    "title": "Meld gRPC Contract Bridge",
     "version": "0.1.0"
   },
   "openapi": "3.0.3",
   "paths": {
-    "/alloy.v1.Greeter/SayHello": {
+    "/meld.v1.Greeter/SayHello": {
       "post": {
         "description": "Swagger-compatible bridge for gRPC method contract discovery.",
         "requestBody": {
           "content": {
             "application/grpc+proto": {
               "schema": {
-                "$ref": "#/components/schemas/alloy.v1.HelloRequest"
+                "$ref": "#/components/schemas/meld.v1.HelloRequest"
               }
             }
           },
@@ -46,7 +46,7 @@
             "content": {
               "application/grpc+proto": {
                 "schema": {
-                  "$ref": "#/components/schemas/alloy.v1.HelloResponse"
+                  "$ref": "#/components/schemas/meld.v1.HelloResponse"
                 }
               }
             },
@@ -54,10 +54,10 @@
           }
         },
         "summary": "Greeter.SayHello",
-        "x-alloy-grpc": {
+        "x-meld-grpc": {
           "client_streaming": false,
           "method": "SayHello",
-          "package": "alloy.v1",
+          "package": "meld.v1",
           "server_streaming": false,
           "service": "Greeter"
         }

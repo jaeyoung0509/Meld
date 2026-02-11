@@ -7,11 +7,11 @@ This project uses three CI jobs so failures are clearly scoped:
 - `cargo test --workspace`
 
 2. `REST gRPC E2E`
-- `cargo test -p alloy-server --test multiplexing -- --nocapture`
+- `cargo test -p meld-server --test multiplexing -- --nocapture`
 
 3. `Docs Contract Drift Check`
 - `./scripts/check_grpc_contract_docs.sh`
-- `cargo test -p alloy-server openapi_json_is_available -- --nocapture`
+- `cargo test -p meld-server openapi_json_is_available -- --nocapture`
 
 ## Local Equivalent
 

@@ -1,0 +1,16 @@
+[package]
+name = "renamed-meld-app"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+meld = { package = "meld-server", path = "../../crates/meld-server" }
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+validator.workspace = true
+
+[dev-dependencies]
+tower.workspace = true

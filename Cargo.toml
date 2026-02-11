@@ -1,8 +1,8 @@
 [workspace]
 members = [
-  "crates/alloy-core", "crates/alloy-macros",
-  "crates/alloy-rpc",
-  "crates/alloy-server", "examples/renamed-alloy-app",
+  "crates/meld-core", "crates/meld-macros",
+  "crates/meld-rpc",
+  "crates/meld-server", "examples/renamed-meld-app",
   "examples/simple-server",
 ]
 resolver = "2"

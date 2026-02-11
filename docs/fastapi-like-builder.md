@@ -1,17 +1,17 @@
 # FastAPI-Like Builder API
 
-Alloy exposes a fluent server builder for a compact startup flow.
+Meld exposes a fluent server builder for a compact startup flow.
 
 ## Quick Start
 
 ```rust
 use std::net::SocketAddr;
 
-use alloy_server::prelude::*;
+use meld_server::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    AlloyServer::new()
+    MeldServer::new()
         .with_addr(SocketAddr::from(([127, 0, 0, 1], 3000)))
         .run()
         .await?;
@@ -19,8 +19,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-`alloy_server::prelude::*` includes:
-- `AlloyServer`
+`meld_server::prelude::*` includes:
+- `MeldServer`
 - `route` macro
 - common validation extractors (`ValidatedJson`, `ValidatedQuery`, `ValidatedPath`, `ValidatedParts`)
 - `Depends` DI extractor
@@ -42,7 +42,7 @@ You can model FastAPI-like DTOs with `serde` and inject shared dependencies usin
 ```rust
 use std::sync::Arc;
 
-use alloy_core::AppState;
+use meld_core::AppState;
 use axum::{
     extract::{Path, Query, State},
     Json,
@@ -84,16 +84,16 @@ See `/examples/simple-server/src/main.rs` for a runnable end-to-end example usin
 
 ## Validation And Error DTO Pattern
 
-Alloy now includes reusable REST validation helpers:
+Meld now includes reusable REST validation helpers:
 
-- `alloy_server::api::ValidatedJson<T>`
-- `alloy_server::api::ValidatedQuery<T>`
-- `alloy_server::api::ApiErrorResponse`
+- `meld_server::api::ValidatedJson<T>`
+- `meld_server::api::ValidatedQuery<T>`
+- `meld_server::api::ApiErrorResponse`
 
 Typical usage:
 
 ```rust
-use alloy_server::api::{ApiError, ValidatedJson};
+use meld_server::api::{ApiError, ValidatedJson};
 use validator::Validate;
 
 #[derive(serde::Deserialize, Validate)]
@@ -120,7 +120,7 @@ OpenAPI wiring:
 
 ## Auto-Validate Route Macro (FastAPI-Like DX)
 
-For a more FastAPI-like handler style, use `#[alloy_server::route(..., auto_validate)]`.
+For a more FastAPI-like handler style, use `#[meld_server::route(..., auto_validate)]`.
 
 With `auto_validate`, handler arguments are rewritten at compile time:
 - `Json<T>` -> `ValidatedJson<T>`
@@ -130,10 +130,10 @@ With `auto_validate`, handler arguments are rewritten at compile time:
 Example:
 
 ```rust
-use alloy_server::api::ApiError;
+use meld_server::api::ApiError;
 use axum::Json;
 
-#[alloy_server::route(post, "/notes", auto_validate)]
+#[meld_server::route(post, "/notes", auto_validate)]
 async fn create_note(Json(body): Json<CreateNoteBody>) -> Result<Json<String>, ApiError> {
     Ok(Json(body.title))
 }
@@ -146,11 +146,11 @@ that implements `Validate`.
 
 Macro portability:
 - `#[route(...)]` expansion is dependency-rename safe.
-- Example compile coverage exists under `examples/renamed-alloy-app`.
+- Example compile coverage exists under `examples/renamed-meld-app`.
 
 ## SSE Endpoint Pattern
 
-Alloy supports Server-Sent Events (SSE) for lightweight one-way real-time updates.
+Meld supports Server-Sent Events (SSE) for lightweight one-way real-time updates.
 
 ```rust
 use std::{convert::Infallible, time::Duration};
@@ -184,7 +184,7 @@ Client reconnect guidance:
 
 ## WebSocket Endpoint Pattern
 
-Alloy supports WebSocket upgrade handlers for bidirectional realtime flows.
+Meld supports WebSocket upgrade handlers for bidirectional realtime flows.
 
 ```rust
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -201,19 +201,19 @@ async fn handle_ws(mut socket: WebSocket) {
 }
 ```
 
-Server defaults in `alloy-server`:
-- max text frame bytes: `ALLOY_WS_MAX_TEXT_BYTES` (default `4096`)
-- idle timeout seconds: `ALLOY_WS_IDLE_TIMEOUT_SECS` (default `45`)
+Server defaults in `meld-server`:
+- max text frame bytes: `MELD_WS_MAX_TEXT_BYTES` (default `4096`)
+- idle timeout seconds: `MELD_WS_IDLE_TIMEOUT_SECS` (default `45`)
 
 ## OAuth2/OIDC JWT Auth Pattern
 
-Alloy includes shared JWT claim validation used by both REST and gRPC layers.
+Meld includes shared JWT claim validation used by both REST and gRPC layers.
 
 Environment configuration:
-- `ALLOY_AUTH_ENABLED=true`
-- `ALLOY_AUTH_JWT_SECRET=<hmac-secret>`
-- optional: `ALLOY_AUTH_ISSUER=<issuer>`
-- optional: `ALLOY_AUTH_AUDIENCE=<audience>`
+- `MELD_AUTH_ENABLED=true`
+- `MELD_AUTH_JWT_SECRET=<hmac-secret>`
+- optional: `MELD_AUTH_ISSUER=<issuer>`
+- optional: `MELD_AUTH_AUDIENCE=<audience>`
 
 When enabled:
 - REST protected route example: `GET /protected/whoami` (Bearer token required)
@@ -224,14 +224,14 @@ When disabled:
 
 ## Depends-Like Extractor Pattern
 
-For FastAPI `Depends(...)` style injection, use `alloy_server::di::Depends<T>`.
+For FastAPI `Depends(...)` style injection, use `meld_server::di::Depends<T>`.
 `Depends<T>` resolves dependencies from state (`FromRef`) with request-scoped caching.
 
 ```rust
 use std::sync::Arc;
 
-use alloy_core::AppState;
-use alloy_server::di::Depends;
+use meld_core::AppState;
+use meld_server::di::Depends;
 use axum::extract::FromRef;
 
 #[derive(Clone)]
@@ -253,9 +253,9 @@ async fn handler(Depends(info): Depends<ServiceInfo>) -> String {
 ```
 
 Test override helper:
-- `alloy_server::di::with_dependency_override(router, value)`
+- `meld_server::di::with_dependency_override(router, value)`
 
 ## Notes
 
-- Default `AlloyServer::new()` enables both REST and gRPC on a single listener.
-- Default address uses `ALLOY_SERVER_ADDR` if set, otherwise `127.0.0.1:3000`.
+- Default `MeldServer::new()` enables both REST and gRPC on a single listener.
+- Default address uses `MELD_SERVER_ADDR` if set, otherwise `127.0.0.1:3000`.

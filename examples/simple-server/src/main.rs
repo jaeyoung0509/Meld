@@ -1,11 +1,5 @@
 use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 
-use alloy_core::AppState;
-use alloy_server::{
-    api::{bad_request, ApiError},
-    di::Depends,
-    AlloyServer,
-};
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::{FromRef, FromRequestParts, State},
@@ -13,6 +7,12 @@ use axum::{
     response::sse::{Event, KeepAlive, Sse},
     routing::get,
     Json, Router,
+};
+use meld_core::AppState;
+use meld_server::{
+    api::{bad_request, ApiError},
+    di::Depends,
+    MeldServer,
 };
 use serde::{Deserialize, Serialize};
 use tokio_stream::{once, wrappers::IntervalStream, Stream, StreamExt};
@@ -94,7 +94,7 @@ where
     }
 }
 
-#[alloy_server::route(get, "/notes/:id", auto_validate)]
+#[meld_server::route(get, "/notes/:id", auto_validate)]
 async fn get_note(
     ctx: RequestContext,
     Depends(service): Depends<ServiceInfo>,
@@ -112,7 +112,7 @@ async fn get_note(
     }))
 }
 
-#[alloy_server::route(get, "/notes", auto_validate)]
+#[meld_server::route(get, "/notes", auto_validate)]
 async fn list_notes(
     axum::extract::Query(query): axum::extract::Query<NoteQuery>,
 ) -> Json<NotesListResponse> {
@@ -122,7 +122,7 @@ async fn list_notes(
     })
 }
 
-#[alloy_server::route(post, "/notes", auto_validate)]
+#[meld_server::route(post, "/notes", auto_validate)]
 async fn create_note(
     ctx: RequestContext,
     Depends(service): Depends<ServiceInfo>,
@@ -136,7 +136,7 @@ async fn create_note(
     })
 }
 
-#[alloy_server::route(post, "/notes/raw")]
+#[meld_server::route(post, "/notes/raw")]
 async fn create_note_raw(Json(body): Json<CreateNoteBody>) -> Json<NoteResponse> {
     Json(NoteResponse {
         id: "note-raw".to_string(),
@@ -252,7 +252,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/notes/:id", get(get_note))
         .with_state(state.clone());
 
-    AlloyServer::new()
+    MeldServer::new()
         .with_state(state)
         .with_rest_router(custom_router)
         .with_addr(SocketAddr::from(([127, 0, 0, 1], 4000)))
@@ -304,7 +304,7 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("body bytes");
-        let parsed: alloy_server::api::ApiErrorResponse =
+        let parsed: meld_server::api::ApiErrorResponse =
             serde_json::from_slice(&body).expect("api error json");
         assert_eq!(parsed.code, "validation_error");
     }
@@ -351,7 +351,7 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("body bytes");
-        let parsed: alloy_server::api::ApiErrorResponse =
+        let parsed: meld_server::api::ApiErrorResponse =
             serde_json::from_slice(&body).expect("api error json");
         assert_eq!(parsed.code, "validation_error");
     }
@@ -373,7 +373,7 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("body bytes");
-        let parsed: alloy_server::api::ApiErrorResponse =
+        let parsed: meld_server::api::ApiErrorResponse =
             serde_json::from_slice(&body).expect("api error json");
         assert_eq!(parsed.code, "validation_error");
     }

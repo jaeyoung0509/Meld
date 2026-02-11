@@ -5,8 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-alloy-core = { path = "../../crates/alloy-core" }
-alloy-server = { path = "../../crates/alloy-server" }
+meld-core = { path = "../../crates/meld-core" }
+meld-server = { path = "../../crates/meld-server" }
 axum.workspace = true
 serde.workspace = true
 serde_json.workspace = true
