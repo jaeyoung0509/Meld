@@ -416,7 +416,7 @@ fn sse_event_stream(service_name: String) -> impl Stream<Item = Result<Event, In
     let mut sequence = 0u64;
     let ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(2))).map(move |_| {
         sequence += 1;
-        let kind = if sequence % 5 == 0 {
+        let kind = if sequence.checked_rem(5) == Some(0) {
             "heartbeat"
         } else {
             "message"

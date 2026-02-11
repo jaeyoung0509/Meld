@@ -18,17 +18,12 @@ const DEFAULT_TIMEOUT_SECONDS: u64 = 15;
 const DEFAULT_MAX_IN_FLIGHT_REQUESTS: usize = 1024;
 const DEFAULT_REQUEST_BODY_LIMIT_BYTES: usize = 1_048_576;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum CorsAllowOrigins {
+    #[default]
     None,
     Any,
     List(Vec<HeaderValue>),
-}
-
-impl Default for CorsAllowOrigins {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 #[derive(Debug, Clone)]
