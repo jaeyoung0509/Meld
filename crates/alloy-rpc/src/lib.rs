@@ -4,6 +4,7 @@ pub mod proto {
     tonic::include_proto!("alloy.v1");
 }
 
+pub use proto::greeter_client::GreeterClient;
 pub use proto::greeter_server::{Greeter, GreeterServer};
 pub use proto::{HelloRequest, HelloResponse};
 
