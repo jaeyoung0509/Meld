@@ -49,6 +49,21 @@ async fn serves_rest_and_grpc_on_single_port() {
     };
     assert_eq!(health_response.as_u16(), 200);
 
+    let events_response = rest_client
+        .get(format!("{base_url}/events"))
+        .send()
+        .await
+        .expect("sse endpoint should be reachable");
+    assert_eq!(events_response.status().as_u16(), 200);
+    let events_content_type = events_response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .expect("content-type header on sse")
+        .to_str()
+        .expect("content-type should be valid");
+    assert!(events_content_type.starts_with("text/event-stream"));
+    drop(events_response);
+
     let hello_response = rest_client
         .get(format!("{base_url}/hello/Rust"))
         .header("x-request-id", "rest-hello-id")

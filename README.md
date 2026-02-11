@@ -13,6 +13,8 @@ Alloy is a Rust server framework focused on **FastAPI-like developer ergonomics*
 - gRPC contract bridge docs:
   - `/grpc/contracts`
   - `/grpc/contracts/openapi.json`
+- REST SSE stream:
+  - `/events`
 - Fluent server builder API:
   - `AlloyServer::new().with_...().run()`
 - Shared middleware stack:
@@ -38,6 +40,7 @@ ALLOY_SERVER_ADDR=127.0.0.1:4000 cargo run -p alloy-server
 ```bash
 curl -s http://127.0.0.1:3000/health
 curl -s http://127.0.0.1:3000/hello/Rust
+curl -N http://127.0.0.1:3000/events
 ```
 
 ### 3) Open docs
