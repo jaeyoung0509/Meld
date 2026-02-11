@@ -22,6 +22,9 @@ Meld is a Rust server framework focused on **FastAPI-like developer ergonomics**
   - `/protected/whoami`
 - Fluent server builder API:
   - `MeldServer::new().with_...().run()`
+- Single-attribute DTO macro:
+  - `#[meld_server::dto]` for `Deserialize + Validate + ToSchema`
+  - keep `utoipa` in your crate dependencies for schema derive expansion
 - Depends-style DI extractor with request cache:
   - `meld_server::di::Depends<T>`
 - Shared middleware stack:
@@ -110,6 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 See:
 - `docs/fastapi-like-builder.md`
+- `docs/dx-scorecard.md`
 - `examples/simple-server/src/main.rs`
 - `examples/renamed-meld-app/src/main.rs` (dependency-rename-safe macro usage)
 

@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `meld_server::prelude::*` includes:
 - `MeldServer`
-- `route` macro
+- `route` and `dto` macros
 - common validation extractors (`ValidatedJson`, `ValidatedQuery`, `ValidatedPath`, `ValidatedParts`)
 - `Depends` DI extractor
 
@@ -37,7 +37,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## DTO And Dependency Injection Pattern
 
-You can model FastAPI-like DTOs with `serde` and inject shared dependencies using `State<Arc<AppState>>`.
+You can model FastAPI-like DTOs with `#[meld_server::dto]` and inject shared dependencies using `State<Arc<AppState>>`.
+
+`dto` requirements:
+- `utoipa` must be available in the crate dependencies (for `ToSchema` derive expansion)
+- `validator` field attributes (such as `#[validate(...)]`) are supported directly
 
 ```rust
 use std::sync::Arc;
@@ -47,20 +51,20 @@ use axum::{
     extract::{Path, Query, State},
     Json,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-#[derive(Deserialize)]
+#[meld_server::dto]
 struct NotePath {
     id: String,
 }
 
-#[derive(Deserialize)]
+#[meld_server::dto]
 struct NoteQuery {
     q: Option<String>,
     limit: Option<u32>,
 }
 
-#[derive(Deserialize)]
+#[meld_server::dto]
 struct CreateNoteBody {
     title: String,
 }
@@ -94,9 +98,7 @@ Typical usage:
 
 ```rust
 use meld_server::api::{ApiError, ValidatedJson};
-use validator::Validate;
-
-#[derive(serde::Deserialize, Validate)]
+#[meld_server::dto]
 struct CreateNoteBody {
     #[validate(length(min = 2, max = 120))]
     title: String,
@@ -112,7 +114,8 @@ async fn create_note(
 Validation failures return a structured `400` error JSON with:
 - `code`
 - `message`
-- `details` (field-level messages)
+- `detail` (FastAPI-like issue list with `loc`, `msg`, `type`)
+- `details` (legacy field-level map kept for compatibility)
 
 OpenAPI wiring:
 - shared error schema uses `ApiErrorResponse`
@@ -254,6 +257,9 @@ async fn handler(Depends(info): Depends<ServiceInfo>) -> String {
 
 Test override helper:
 - `meld_server::di::with_dependency_override(router, value)`
+- `meld_server::di::with_dependency(router, value)`
+- `meld_server::di::with_dependency_overrides(router, overrides)`
+- `MeldServer::with_dependency(value)`
 
 ## Notes
 

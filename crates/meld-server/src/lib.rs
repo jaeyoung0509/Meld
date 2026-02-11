@@ -29,7 +29,14 @@ use serde::Serialize;
 use serde_json::Value;
 use tokio_stream::{once, wrappers::IntervalStream, Stream, StreamExt};
 use tonic::service::Routes;
-use utoipa::OpenApi;
+use utoipa::{
+    openapi::{
+        path::{HttpMethod, Operation, PathItem},
+        response::ResponseBuilder,
+        Content, Ref,
+    },
+    Modify, OpenApi,
+};
 use utoipa_swagger_ui::SwaggerUi;
 
 pub mod api;
@@ -40,17 +47,23 @@ pub mod grpc;
 pub mod middleware;
 use crate::api::ApiErrorResponse;
 pub use builder::MeldServer;
-pub use meld_macros::route;
+pub use meld_macros::{dto, route};
+pub use serde;
+pub use utoipa;
+pub use validator;
 pub type AlloyServer = MeldServer;
 
 pub mod prelude {
     pub use crate::api::{
         ApiError, ApiErrorResponse, ValidatedJson, ValidatedParts, ValidatedPath, ValidatedQuery,
     };
-    pub use crate::di::{with_dependency_override, Depends};
-    pub use crate::route;
+    pub use crate::di::{
+        with_dependency, with_dependency_override, with_dependency_overrides, DependencyOverrides,
+        Depends,
+    };
     pub use crate::AlloyServer;
     pub use crate::MeldServer;
+    pub use crate::{dto, route};
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -90,13 +103,106 @@ struct ServerSentEventPayload {
         HealthResponse,
         HelloRestResponse,
         ProtectedWhoAmIResponse,
-        ApiErrorResponse
+        ApiErrorResponse,
+        crate::api::ApiValidationIssue
     )),
+    modifiers(&ApiDocDefaults),
     tags(
         (name = "rest", description = "Meld REST endpoints")
     )
 )]
 struct ApiDoc;
+
+struct ApiDocDefaults;
+
+impl Modify for ApiDocDefaults {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        add_docs_discovery_description(openapi);
+
+        let paths = &mut openapi.paths;
+
+        for (path, path_item) in &mut paths.paths {
+            for method in [
+                HttpMethod::Get,
+                HttpMethod::Put,
+                HttpMethod::Post,
+                HttpMethod::Delete,
+                HttpMethod::Patch,
+                HttpMethod::Options,
+                HttpMethod::Head,
+                HttpMethod::Trace,
+            ] {
+                let Some(operation) = operation_mut(path_item, method) else {
+                    continue;
+                };
+                ensure_error_response(
+                    operation,
+                    "400",
+                    "Bad request or validation error",
+                    "ApiErrorResponse",
+                );
+                ensure_error_response(
+                    operation,
+                    "500",
+                    "Internal server error",
+                    "ApiErrorResponse",
+                );
+                if path.starts_with("/protected/") {
+                    ensure_error_response(operation, "401", "Unauthorized", "ApiErrorResponse");
+                }
+            }
+        }
+    }
+}
+
+fn add_docs_discovery_description(openapi: &mut utoipa::openapi::OpenApi) {
+    let links = "Related docs: /docs (REST Swagger UI), /grpc/contracts (rendered gRPC contracts), /grpc/contracts/openapi.json (gRPC OpenAPI bridge).";
+    let current = openapi.info.description.take().unwrap_or_default();
+    let merged = if current.is_empty() {
+        links.to_string()
+    } else if current.contains("/grpc/contracts") {
+        current
+    } else {
+        format!("{current}\n\n{links}")
+    };
+    openapi.info.description = Some(merged);
+}
+
+fn operation_mut(path_item: &mut PathItem, method: HttpMethod) -> Option<&mut Operation> {
+    match method {
+        HttpMethod::Get => path_item.get.as_mut(),
+        HttpMethod::Put => path_item.put.as_mut(),
+        HttpMethod::Post => path_item.post.as_mut(),
+        HttpMethod::Delete => path_item.delete.as_mut(),
+        HttpMethod::Options => path_item.options.as_mut(),
+        HttpMethod::Head => path_item.head.as_mut(),
+        HttpMethod::Patch => path_item.patch.as_mut(),
+        HttpMethod::Trace => path_item.trace.as_mut(),
+    }
+}
+
+fn ensure_error_response(
+    operation: &mut Operation,
+    status: &str,
+    description: &str,
+    schema_name: &str,
+) {
+    if operation.responses.responses.contains_key(status) {
+        return;
+    }
+
+    let response = ResponseBuilder::new()
+        .description(description)
+        .content(
+            "application/json",
+            Content::new(Some(Ref::from_schema_name(schema_name))),
+        )
+        .build();
+    operation
+        .responses
+        .responses
+        .insert(status.to_string(), response.into());
+}
 
 pub fn build_router(state: Arc<AppState>) -> Router {
     build_router_with_auth(state, auth::AuthRuntimeConfig::from_env())
@@ -178,15 +284,13 @@ async fn health(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
         ("name" = String, Path, description = "Name to greet")
     ),
     responses(
-        (status = 200, description = "Hello response", body = HelloRestResponse),
-        (status = 400, description = "Validation error", body = ApiErrorResponse),
-        (status = 500, description = "Internal error", body = ApiErrorResponse)
+        (status = 200, description = "Hello response", body = HelloRestResponse)
     )
 )]
 async fn hello(
     Path(name): Path<String>,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<HelloRestResponse>, (StatusCode, String)> {
+) -> Result<Json<HelloRestResponse>, api::ApiError> {
     let response = build_hello_response(&state, HelloRequest { name }).map_err(map_error)?;
     Ok(Json(HelloRestResponse {
         message: response.message,
@@ -198,8 +302,7 @@ async fn hello(
     path = "/protected/whoami",
     tag = "rest",
     responses(
-        (status = 200, description = "Current principal (authenticated user or anonymous when auth is disabled)", body = ProtectedWhoAmIResponse),
-        (status = 401, description = "Unauthorized (auth enabled and token missing/invalid)", body = ApiErrorResponse)
+        (status = 200, description = "Current principal (authenticated user or anonymous when auth is disabled)", body = ProtectedWhoAmIResponse)
     )
 )]
 async fn protected_whoami(
@@ -403,11 +506,8 @@ fn grpc_contracts_html_document() -> &'static str {
     })
 }
 
-fn map_error(err: MeldError) -> (StatusCode, String) {
-    match err {
-        MeldError::Validation(message) => (StatusCode::BAD_REQUEST, message),
-        MeldError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
-    }
+fn map_error(err: MeldError) -> api::ApiError {
+    api::map_domain_error_to_rest(err)
 }
 
 fn sse_event_stream(service_name: String) -> impl Stream<Item = Result<Event, Infallible>> {
@@ -499,6 +599,10 @@ mod tests {
         assert!(body_text.contains("/hello/{name}"));
         assert!(body_text.contains("/protected/whoami"));
         assert!(body_text.contains("ApiErrorResponse"));
+        assert!(body_text.contains("ApiValidationIssue"));
+        assert!(body_text.contains("\"400\""));
+        assert!(body_text.contains("\"500\""));
+        assert!(body_text.contains("/grpc/contracts"));
     }
 
     #[tokio::test]

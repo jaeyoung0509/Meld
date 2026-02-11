@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::auth::AuthRuntimeConfig;
-use meld_core::{AppState, MeldError};
+use meld_core::AppState;
 use meld_rpc::{build_hello_response, Greeter, GreeterServer, HelloRequest, HelloResponse};
 use tonic::{service::interceptor::InterceptedService, Request, Response, Status};
 
@@ -42,11 +42,8 @@ pub fn build_grpc_service_with_auth(
     InterceptedService::new(service, GrpcAuthInterceptor { auth_cfg })
 }
 
-fn map_error(err: MeldError) -> Status {
-    match err {
-        MeldError::Validation(message) => Status::invalid_argument(message),
-        MeldError::Internal(message) => Status::internal(message),
-    }
+fn map_error(err: meld_core::MeldError) -> Status {
+    crate::api::map_domain_error_to_grpc(err)
 }
 
 #[derive(Clone)]
