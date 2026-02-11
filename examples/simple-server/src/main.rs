@@ -2,7 +2,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use alloy_core::AppState;
 use alloy_server::{
-    api::{bad_request, ApiError, ValidatedJson, ValidatedQuery},
+    api::{bad_request, ApiError},
     AlloyServer,
 };
 use axum::{
@@ -73,7 +73,9 @@ async fn get_note(
     State(state): State<Arc<AppState>>,
     Path(path): Path<NotePath>,
 ) -> Result<Json<NoteResponse>, ApiError> {
-    let title = state.greet(&path.id).map_err(|err| bad_request(err.to_string()))?;
+    let title = state
+        .greet(&path.id)
+        .map_err(|err| bad_request(err.to_string()))?;
     Ok(Json(NoteResponse {
         id: path.id,
         title,
@@ -81,21 +83,31 @@ async fn get_note(
     }))
 }
 
-async fn list_notes(ValidatedQuery(query): ValidatedQuery<NoteQuery>) -> Json<NotesListResponse> {
+#[alloy_server::route(get, "/notes", auto_validate)]
+async fn list_notes(
+    axum::extract::Query(query): axum::extract::Query<NoteQuery>,
+) -> Json<NotesListResponse> {
     Json(NotesListResponse {
         query: query.q,
         limit: query.limit.unwrap_or(20),
     })
 }
 
-async fn create_note(
-    ctx: RequestContext,
-    ValidatedJson(body): ValidatedJson<CreateNoteBody>,
-) -> Json<NoteResponse> {
+#[alloy_server::route(post, "/notes", auto_validate)]
+async fn create_note(ctx: RequestContext, Json(body): Json<CreateNoteBody>) -> Json<NoteResponse> {
     Json(NoteResponse {
         id: "note-1".to_string(),
         title: body.title,
         request_id: ctx.request_id,
+    })
+}
+
+#[alloy_server::route(post, "/notes/raw")]
+async fn create_note_raw(Json(body): Json<CreateNoteBody>) -> Json<NoteResponse> {
+    Json(NoteResponse {
+        id: "note-raw".to_string(),
+        title: body.title,
+        request_id: None,
     })
 }
 
@@ -104,6 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState::local("simple-server"));
     let custom_router = Router::new()
         .route("/notes", get(list_notes).post(create_note))
+        .route("/notes/raw", axum::routing::post(create_note_raw))
         .route("/notes/:id", get(get_note))
         .with_state(state.clone());
 
@@ -129,6 +142,7 @@ mod tests {
         let state = Arc::new(AppState::local("simple-server-test"));
         Router::new()
             .route("/notes", get(list_notes).post(create_note))
+            .route("/notes/raw", axum::routing::post(create_note_raw))
             .route("/notes/:id", get(get_note))
             .with_state(state)
     }
@@ -178,5 +192,44 @@ mod tests {
         let parsed: NoteResponse = serde_json::from_slice(&body).expect("note json");
         assert_eq!(parsed.title, "My Note");
         assert_eq!(parsed.request_id.as_deref(), Some("req-1"));
+    }
+
+    #[tokio::test]
+    async fn invalid_query_returns_structured_400() {
+        let response = app()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/notes?limit=0")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("request should complete");
+
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body bytes");
+        let parsed: alloy_server::api::ApiErrorResponse =
+            serde_json::from_slice(&body).expect("api error json");
+        assert_eq!(parsed.code, "validation_error");
+    }
+
+    #[tokio::test]
+    async fn without_auto_validate_keeps_original_behavior() {
+        let response = app()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/notes/raw")
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(r#"{"title":"x"}"#))
+                    .unwrap(),
+            )
+            .await
+            .expect("request should complete");
+
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
     }
 }

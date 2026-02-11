@@ -53,6 +53,7 @@ name = "alloy-server"
 version = "0.1.0"
 dependencies = [
  "alloy-core",
+ "alloy-macros",
  "alloy-rpc",
  "axum",
  "http",
