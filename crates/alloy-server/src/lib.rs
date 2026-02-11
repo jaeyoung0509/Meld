@@ -6,18 +6,48 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     routing::get,
-    Router,
+    Json, Router,
 };
+use serde::Serialize;
 use tonic::service::Routes;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 pub mod grpc;
 pub mod middleware;
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct RootResponse {
+    pub service_name: String,
+    pub environment: String,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct HealthResponse {
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct HelloRestResponse {
+    pub message: String,
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(root, health, hello),
+    components(schemas(RootResponse, HealthResponse, HelloRestResponse)),
+    tags(
+        (name = "rest", description = "Alloy REST endpoints")
+    )
+)]
+struct ApiDoc;
 
 pub fn build_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(root))
         .route("/health", get(health))
         .route("/hello/:name", get(hello))
+        .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .with_state(state)
 }
 
@@ -30,24 +60,57 @@ pub fn build_multiplexed_router(state: Arc<AppState>) -> Router {
     rest.merge(grpc)
 }
 
-async fn root(State(state): State<Arc<AppState>>) -> String {
-    format!(
-        "{} ({})",
-        state.config.service_name, state.config.environment
+#[utoipa::path(
+    get,
+    path = "/",
+    tag = "rest",
+    responses(
+        (status = 200, description = "Root endpoint", body = RootResponse)
     )
+)]
+async fn root(State(state): State<Arc<AppState>>) -> Json<RootResponse> {
+    Json(RootResponse {
+        service_name: state.config.service_name.clone(),
+        environment: state.config.environment.clone(),
+    })
 }
 
-async fn health(State(state): State<Arc<AppState>>) -> &'static str {
+#[utoipa::path(
+    get,
+    path = "/health",
+    tag = "rest",
+    responses(
+        (status = 200, description = "Health status", body = HealthResponse)
+    )
+)]
+async fn health(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
     state.metrics.incr_counter("http.health.requests");
-    "OK"
+    Json(HealthResponse {
+        status: "OK".to_string(),
+    })
 }
 
+#[utoipa::path(
+    get,
+    path = "/hello/{name}",
+    tag = "rest",
+    params(
+        ("name" = String, Path, description = "Name to greet")
+    ),
+    responses(
+        (status = 200, description = "Hello response", body = HelloRestResponse),
+        (status = 400, description = "Validation error"),
+        (status = 500, description = "Internal error")
+    )
+)]
 async fn hello(
     Path(name): Path<String>,
     State(state): State<Arc<AppState>>,
-) -> Result<String, (StatusCode, String)> {
+) -> Result<Json<HelloRestResponse>, (StatusCode, String)> {
     let response = build_hello_response(&state, HelloRequest { name }).map_err(map_error)?;
-    Ok(response.message)
+    Ok(Json(HelloRestResponse {
+        message: response.message,
+    }))
 }
 
 fn map_error(err: AlloyError) -> (StatusCode, String) {
@@ -60,6 +123,7 @@ fn map_error(err: AlloyError) -> (StatusCode, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::body::to_bytes;
     use axum::http::{Request, StatusCode};
     use tower::util::ServiceExt;
 
@@ -72,5 +136,28 @@ mod tests {
             .expect("request should succeed");
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn openapi_json_is_available() {
+        let app = build_router(Arc::new(AppState::local("test-server")));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/openapi.json")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("request should succeed");
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let bytes = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body bytes");
+        let body_text = String::from_utf8(bytes.to_vec()).expect("valid utf8");
+        assert!(body_text.contains("/health"));
+        assert!(body_text.contains("/hello/{name}"));
     }
 }
