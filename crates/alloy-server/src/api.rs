@@ -1,5 +1,5 @@
 use axum::{
-    extract::{FromRequest, FromRequestParts, Query},
+    extract::{FromRequest, FromRequestParts, Path, Query},
     http::{request::Parts, StatusCode},
     response::IntoResponse,
     Json,
@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use validator::{Validate, ValidationErrors};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ApiErrorResponse {
     pub code: String,
     pub message: String,
@@ -106,6 +106,47 @@ where
         let Query(value) = Query::<T>::from_request_parts(parts, state)
             .await
             .map_err(|err| bad_request(format!("invalid query: {err}")))?;
+        value.validate().map_err(validation_error)?;
+        Ok(Self(value))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ValidatedPath<T>(pub T);
+
+#[axum::async_trait]
+impl<T, S> FromRequestParts<S> for ValidatedPath<T>
+where
+    T: DeserializeOwned + Validate + Send,
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let Path(value) = Path::<T>::from_request_parts(parts, state)
+            .await
+            .map_err(|err| bad_request(format!("invalid path: {err}")))?;
+        value.validate().map_err(validation_error)?;
+        Ok(Self(value))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ValidatedParts<T>(pub T);
+
+#[axum::async_trait]
+impl<T, S> FromRequestParts<S> for ValidatedParts<T>
+where
+    T: FromRequestParts<S> + Validate,
+    T::Rejection: std::fmt::Display,
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let value = T::from_request_parts(parts, state)
+            .await
+            .map_err(|err| bad_request(format!("invalid request parts: {err}")))?;
         value.validate().map_err(validation_error)?;
         Ok(Self(value))
     }
