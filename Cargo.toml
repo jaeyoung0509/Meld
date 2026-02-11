@@ -2,7 +2,7 @@
 members = [
   "crates/alloy-core", "crates/alloy-macros",
   "crates/alloy-rpc",
-  "crates/alloy-server",
+  "crates/alloy-server", "examples/renamed-alloy-app",
   "examples/simple-server",
 ]
 resolver = "2"

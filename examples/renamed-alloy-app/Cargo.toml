@@ -1,0 +1,16 @@
+[package]
+name = "renamed-alloy-app"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+alloy = { package = "alloy-server", path = "../../crates/alloy-server" }
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+validator.workspace = true
+
+[dev-dependencies]
+tower.workspace = true

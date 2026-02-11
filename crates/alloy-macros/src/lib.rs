@@ -1,8 +1,11 @@
 use proc_macro::TokenStream;
+use proc_macro2::Span;
+use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
+use syn::spanned::Spanned;
 use syn::{
     parse::Parse, parse_macro_input, parse_quote, Error, FnArg, GenericArgument, Ident, ItemFn,
-    LitStr, Pat, PatTupleStruct, PathArguments, Token, Type,
+    LitStr, Pat, PatTupleStruct, PathArguments, PathSegment, Token, Type,
 };
 
 struct RouteArgs {
@@ -18,6 +21,40 @@ enum RouteMethod {
     Put,
     Patch,
     Delete,
+}
+
+#[derive(Clone, Copy)]
+enum ExtractorKind {
+    Json,
+    Query,
+    Path,
+}
+
+impl ExtractorKind {
+    fn parse(name: &str) -> Option<Self> {
+        match name {
+            "Json" => Some(Self::Json),
+            "Query" => Some(Self::Query),
+            "Path" => Some(Self::Path),
+            _ => None,
+        }
+    }
+
+    fn source_ident(self) -> &'static str {
+        match self {
+            Self::Json => "Json",
+            Self::Query => "Query",
+            Self::Path => "Path",
+        }
+    }
+
+    fn validated_ident(self) -> &'static str {
+        match self {
+            Self::Json => "ValidatedJson",
+            Self::Query => "ValidatedQuery",
+            Self::Path => "ValidatedPath",
+        }
+    }
 }
 
 impl Parse for RouteArgs {
@@ -69,7 +106,13 @@ pub fn route(args: TokenStream, item: TokenStream) -> TokenStream {
     let mut item_fn = parse_macro_input!(item as ItemFn);
 
     if parsed.auto_validate {
-        apply_auto_validate(&mut item_fn);
+        let alloy_crate = match resolve_alloy_server_path() {
+            Ok(path) => path,
+            Err(err) => return err.to_compile_error().into(),
+        };
+        if let Err(err) = apply_auto_validate(&mut item_fn, &alloy_crate) {
+            return err.to_compile_error().into();
+        }
     }
 
     let _ = (parsed.method, parsed.path);
@@ -77,56 +120,180 @@ pub fn route(args: TokenStream, item: TokenStream) -> TokenStream {
     TokenStream::from(quote! { #item_fn })
 }
 
-fn apply_auto_validate(item_fn: &mut ItemFn) {
+fn resolve_alloy_server_path() -> syn::Result<syn::Path> {
+    match crate_name("alloy-server") {
+        Ok(FoundCrate::Itself) => Ok(parse_quote!(crate)),
+        Ok(FoundCrate::Name(name)) => {
+            let sanitized = name.replace('-', "_");
+            let ident = Ident::new(&sanitized, Span::call_site());
+            Ok(parse_quote!(::#ident))
+        }
+        Err(_) => Err(Error::new(
+            Span::call_site(),
+            "failed to resolve `alloy-server` crate for `#[route(..., auto_validate)]`; \
+             ensure the crate is present in Cargo.toml dependencies (renamed deps are supported)",
+        )),
+    }
+}
+
+fn apply_auto_validate(item_fn: &mut ItemFn, alloy_crate: &syn::Path) -> syn::Result<()> {
+    let mut errors: Option<syn::Error> = None;
+
     for input in &mut item_fn.sig.inputs {
         if let FnArg::Typed(arg) = input {
-            maybe_rewrite_typed_arg(arg);
+            if let Err(err) = maybe_rewrite_typed_arg(arg, alloy_crate) {
+                if let Some(existing) = &mut errors {
+                    existing.combine(err);
+                } else {
+                    errors = Some(err);
+                }
+            }
         }
     }
-}
 
-fn maybe_rewrite_typed_arg(arg: &mut syn::PatType) {
-    let Some(rewritten_path) = rewrite_extractor_type(&mut arg.ty) else {
-        return;
-    };
-
-    if let Pat::TupleStruct(PatTupleStruct { path, .. }) = arg.pat.as_mut() {
-        *path = rewritten_path;
+    match errors {
+        Some(err) => Err(err),
+        None => Ok(()),
     }
 }
 
-fn rewrite_extractor_type(ty: &mut Box<Type>) -> Option<syn::Path> {
-    let Type::Path(type_path) = ty.as_mut() else {
-        return None;
+fn maybe_rewrite_typed_arg(arg: &mut syn::PatType, alloy_crate: &syn::Path) -> syn::Result<()> {
+    let (kind, original_segment, inner_ty) = match extract_rewrite_target(&arg.ty)? {
+        Some(values) => values,
+        None => return Ok(()),
     };
 
-    let segment = type_path.path.segments.last()?;
-    let inner_ty = extract_single_generic_type(&segment.arguments)?;
-    let rewritten_path: syn::Path = match segment.ident.to_string().as_str() {
-        "Json" => parse_quote!(::alloy_server::api::ValidatedJson),
-        "Query" => parse_quote!(::alloy_server::api::ValidatedQuery),
-        "Path" => parse_quote!(::alloy_server::api::ValidatedPath),
-        _ => return None,
-    };
-    let rewritten_ty: Type = parse_quote!(#rewritten_path<#inner_ty>);
+    let validated_path = validated_extractor_path(alloy_crate, kind);
+    let rewritten_ty: Type = parse_quote!(#validated_path<#inner_ty>);
+    arg.ty = Box::new(rewritten_ty);
 
-    if !matches!(rewritten_ty, Type::Path(_)) {
-        return None;
-    }
-    *ty = Box::new(rewritten_ty);
-    Some(rewritten_path)
+    rewrite_pattern(&mut arg.pat, kind, &validated_path, &original_segment)
 }
 
-fn extract_single_generic_type(arguments: &PathArguments) -> Option<Type> {
+fn extract_rewrite_target(ty: &Type) -> syn::Result<Option<(ExtractorKind, PathSegment, Type)>> {
+    let Type::Path(type_path) = ty else {
+        return Ok(None);
+    };
+
+    let Some(segment) = type_path.path.segments.last() else {
+        return Ok(None);
+    };
+
+    let Some(kind) = ExtractorKind::parse(segment.ident.to_string().as_str()) else {
+        return Ok(None);
+    };
+
+    let inner_ty = extract_single_generic_type(&segment.arguments).map_err(|err| {
+        Error::new(
+            segment.ident.span(),
+            format!(
+                "`{}` extractor in auto_validate must have exactly one type parameter: {err}",
+                kind.source_ident()
+            ),
+        )
+    })?;
+
+    Ok(Some((kind, segment.clone(), inner_ty)))
+}
+
+fn rewrite_pattern(
+    pat: &mut Box<Pat>,
+    kind: ExtractorKind,
+    validated_path: &syn::Path,
+    original_segment: &PathSegment,
+) -> syn::Result<()> {
+    match pat.as_mut() {
+        Pat::TupleStruct(PatTupleStruct { path, .. }) => {
+            let Some(last) = path.segments.last() else {
+                return Err(Error::new(
+                    path.span(),
+                    format!(
+                        "unsupported `{}` pattern in auto_validate; use `{name}(value)` or `value: {name}<T>`",
+                        kind.source_ident(),
+                        name = kind.source_ident()
+                    ),
+                ));
+            };
+
+            let last_name = last.ident.to_string();
+            let source = kind.source_ident();
+            let validated = kind.validated_ident();
+            if last_name != source && last_name != validated {
+                return Err(Error::new(
+                    last.ident.span(),
+                    format!(
+                        "pattern `{}` does not match extractor `{}` in auto_validate; expected `{}` pattern",
+                        last_name, source, source
+                    ),
+                ));
+            }
+
+            *path = validated_path.clone();
+            Ok(())
+        }
+        Pat::Ident(ident_pat) => {
+            if ident_pat.by_ref.is_some() || ident_pat.subpat.is_some() {
+                return Err(Error::new(
+                    ident_pat.span(),
+                    format!(
+                        "unsupported `{}` binding form in auto_validate; use simple binding like `value: {}<T>`",
+                        kind.source_ident(),
+                        kind.source_ident()
+                    ),
+                ));
+            }
+
+            let ident = ident_pat.ident.clone();
+            let new_pat: Pat = if ident_pat.mutability.is_some() {
+                parse_quote!(#validated_path(mut #ident))
+            } else {
+                parse_quote!(#validated_path(#ident))
+            };
+            **pat = new_pat;
+            Ok(())
+        }
+        Pat::Wild(_) => {
+            let new_pat: Pat = parse_quote!(#validated_path(_));
+            **pat = new_pat;
+            Ok(())
+        }
+        _ => Err(Error::new(
+            pat.span(),
+            format!(
+                "unsupported pattern for `{}` in auto_validate; use `{}` destructuring (`{}(value)`) or simple binding (`value: {}<T>`)",
+                original_segment.ident,
+                kind.source_ident(),
+                kind.source_ident(),
+                kind.source_ident(),
+            ),
+        )),
+    }
+}
+
+fn validated_extractor_path(alloy_crate: &syn::Path, kind: ExtractorKind) -> syn::Path {
+    match kind {
+        ExtractorKind::Json => parse_quote!(#alloy_crate::api::ValidatedJson),
+        ExtractorKind::Query => parse_quote!(#alloy_crate::api::ValidatedQuery),
+        ExtractorKind::Path => parse_quote!(#alloy_crate::api::ValidatedPath),
+    }
+}
+
+fn extract_single_generic_type(arguments: &PathArguments) -> syn::Result<Type> {
     let PathArguments::AngleBracketed(args) = arguments else {
-        return None;
+        return Err(Error::new(Span::call_site(), "missing generic parameter"));
     };
     if args.args.len() != 1 {
-        return None;
+        return Err(Error::new(
+            Span::call_site(),
+            "expected exactly one generic parameter",
+        ));
     }
     match args.args.first() {
-        Some(GenericArgument::Type(ty)) => Some(ty.clone()),
-        _ => None,
+        Some(GenericArgument::Type(ty)) => Ok(ty.clone()),
+        _ => Err(Error::new(
+            Span::call_site(),
+            "generic parameter must be a concrete type",
+        )),
     }
 }
 
@@ -202,7 +369,8 @@ mod tests {
             ) {}
         };
 
-        apply_auto_validate(&mut item_fn);
+        let alloy: syn::Path = parse_quote!(::alloy_server);
+        apply_auto_validate(&mut item_fn, &alloy).expect("rewrite should work");
 
         let first = item_fn
             .sig
@@ -232,6 +400,31 @@ mod tests {
     }
 
     #[test]
+    fn auto_validate_rewrites_identifier_pattern_to_destructure() {
+        let mut item_fn: ItemFn = parse_quote! {
+            async fn create_note(query: Query<ListQuery>) {}
+        };
+
+        let alloy: syn::Path = parse_quote!(::alloy_server);
+        apply_auto_validate(&mut item_fn, &alloy).expect("rewrite should work");
+
+        let first = item_fn.sig.inputs.iter().next().expect("arg should exist");
+        assert_eq!(arg_type_ident(first), Some("ValidatedQuery".to_string()));
+        assert_eq!(arg_pat_ident(first), Some("ValidatedQuery".to_string()));
+    }
+
+    #[test]
+    fn auto_validate_reports_actionable_error_for_unsupported_pattern() {
+        let mut item_fn: ItemFn = parse_quote! {
+            async fn create_note((query): Query<ListQuery>) {}
+        };
+
+        let alloy: syn::Path = parse_quote!(::alloy_server);
+        let err = apply_auto_validate(&mut item_fn, &alloy).expect_err("must fail");
+        assert!(err.to_string().contains("unsupported pattern"));
+    }
+
+    #[test]
     fn without_auto_validate_keeps_original_extractors() {
         let mut item_fn: ItemFn = parse_quote! {
             async fn create_note(Query(q): Query<ListQuery>, Json(body): Json<CreateNote>) {}
@@ -239,7 +432,8 @@ mod tests {
         let args = parse_str::<RouteArgs>(r#"post, "/notes""#).expect("route args should parse");
 
         if args.auto_validate {
-            apply_auto_validate(&mut item_fn);
+            let alloy: syn::Path = parse_quote!(::alloy_server);
+            apply_auto_validate(&mut item_fn, &alloy).expect("rewrite should work");
         }
 
         let rendered = quote!(#item_fn).to_string();
@@ -247,6 +441,20 @@ mod tests {
         assert!(rendered.contains("Json"));
         assert!(!rendered.contains("ValidatedQuery"));
         assert!(!rendered.contains("ValidatedJson"));
+    }
+
+    #[test]
+    fn resolved_path_uses_callsite_crate_alias() {
+        let path: syn::Path = match FoundCrate::Name("alloy_api".to_string()) {
+            FoundCrate::Name(name) => {
+                let ident = Ident::new(&name.replace('-', "_"), Span::call_site());
+                parse_quote!(::#ident)
+            }
+            FoundCrate::Itself => parse_quote!(crate),
+        };
+
+        let rendered = quote!(#path).to_string();
+        assert_eq!(rendered, ":: alloy_api");
     }
 
     fn arg_type_ident(arg: &FnArg) -> Option<String> {

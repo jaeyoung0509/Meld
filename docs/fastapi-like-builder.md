@@ -7,7 +7,7 @@ Alloy exposes a fluent server builder for a compact startup flow.
 ```rust
 use std::net::SocketAddr;
 
-use alloy_server::AlloyServer;
+use alloy_server::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,6 +18,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+`alloy_server::prelude::*` includes:
+- `AlloyServer`
+- `route` macro
+- common validation extractors (`ValidatedJson`, `ValidatedQuery`, `ValidatedPath`, `ValidatedParts`)
+- `Depends` DI extractor
 
 ## Common Customization Points
 
@@ -137,6 +143,10 @@ If you omit `auto_validate`, behavior stays unchanged.
 
 For header/cookie wrapper patterns, use `ValidatedParts<T>` with your custom parts extractor
 that implements `Validate`.
+
+Macro portability:
+- `#[route(...)]` expansion is dependency-rename safe.
+- Example compile coverage exists under `examples/renamed-alloy-app`.
 
 ## SSE Endpoint Pattern
 
