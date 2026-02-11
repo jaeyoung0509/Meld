@@ -1,8 +1,8 @@
-# Alloy
+# Meld
 
-![Alloy Logo](docs/assets/alloy-logo.svg)
+![Meld Logo](docs/assets/meld-logo.svg)
 
-Alloy is a Rust server framework focused on **FastAPI-like developer ergonomics** with **single-port REST + gRPC** delivery.
+Meld is a Rust server framework focused on **FastAPI-like developer ergonomics** with **single-port REST + gRPC** delivery.
 
 ## What You Get
 
@@ -21,9 +21,9 @@ Alloy is a Rust server framework focused on **FastAPI-like developer ergonomics*
 - Optional REST auth-protected route:
   - `/protected/whoami`
 - Fluent server builder API:
-  - `AlloyServer::new().with_...().run()`
+  - `MeldServer::new().with_...().run()`
 - Depends-style DI extractor with request cache:
-  - `alloy_server::di::Depends<T>`
+  - `meld_server::di::Depends<T>`
 - Shared middleware stack:
   - tracing, request-id propagation, CORS, timeout, concurrency limit
 
@@ -32,14 +32,14 @@ Alloy is a Rust server framework focused on **FastAPI-like developer ergonomics*
 ### 1) Start the default server
 
 ```bash
-cargo run -p alloy-server
+cargo run -p meld-server
 ```
 
 Default address: `127.0.0.1:3000`  
 Override with:
 
 ```bash
-ALLOY_SERVER_ADDR=127.0.0.1:4000 cargo run -p alloy-server
+MELD_SERVER_ADDR=127.0.0.1:4000 cargo run -p meld-server
 ```
 
 ### 2) Verify REST
@@ -52,21 +52,21 @@ curl -N http://127.0.0.1:3000/events
 ```
 
 WebSocket defaults:
-- max text frame: `4096` bytes (`ALLOY_WS_MAX_TEXT_BYTES`)
-- idle timeout: `45` seconds (`ALLOY_WS_IDLE_TIMEOUT_SECS`)
+- max text frame: `4096` bytes (`MELD_WS_MAX_TEXT_BYTES`)
+- idle timeout: `45` seconds (`MELD_WS_IDLE_TIMEOUT_SECS`)
 
 Middleware defaults:
-- request timeout: `15` seconds (`ALLOY_TIMEOUT_SECONDS`)
-- max in-flight requests: `1024` (`ALLOY_MAX_IN_FLIGHT_REQUESTS`)
-- request body limit: `1048576` bytes (`ALLOY_REQUEST_BODY_LIMIT_BYTES`)
-- CORS: disabled by default; set `ALLOY_CORS_ALLOW_ORIGINS` to a comma-separated allowlist (use `*` only when you intentionally want wildcard CORS)
+- request timeout: `15` seconds (`MELD_TIMEOUT_SECONDS`)
+- max in-flight requests: `1024` (`MELD_MAX_IN_FLIGHT_REQUESTS`)
+- request body limit: `1048576` bytes (`MELD_REQUEST_BODY_LIMIT_BYTES`)
+- CORS: disabled by default; set `MELD_CORS_ALLOW_ORIGINS` to a comma-separated allowlist (use `*` only when you intentionally want wildcard CORS)
 
 Auth defaults:
-- disabled by default (`ALLOY_AUTH_ENABLED=false`)
-- when enabled, JWT HMAC secret required (`ALLOY_AUTH_JWT_SECRET`)
+- disabled by default (`MELD_AUTH_ENABLED=false`)
+- when enabled, JWT HMAC secret required (`MELD_AUTH_JWT_SECRET`)
 - optional issuer/audience checks:
-  - `ALLOY_AUTH_ISSUER`
-  - `ALLOY_AUTH_AUDIENCE`
+  - `MELD_AUTH_ISSUER`
+  - `MELD_AUTH_AUDIENCE`
 - `/protected/whoami` behavior:
   - auth disabled: returns `200` with anonymous principal
   - auth enabled: requires bearer JWT and returns `401` when missing/invalid
@@ -82,11 +82,11 @@ Auth defaults:
 ## Repository Layout
 
 ```text
-crates/alloy-core     # domain, state, error model
-crates/alloy-rpc      # proto, tonic codegen, grpc-docgen tool
-crates/alloy-server   # REST + gRPC routing, middleware, builder API
+crates/meld-core     # domain, state, error model
+crates/meld-rpc      # proto, tonic codegen, grpc-docgen tool
+crates/meld-server   # REST + gRPC routing, middleware, builder API
 examples/simple-server
-examples/renamed-alloy-app
+examples/renamed-meld-app
 docs/
 scripts/
 ```
@@ -96,11 +96,11 @@ scripts/
 ```rust
 use std::net::SocketAddr;
 
-use alloy_server::AlloyServer;
+use meld_server::MeldServer;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    AlloyServer::new()
+    MeldServer::new()
         .with_addr(SocketAddr::from(([127, 0, 0, 1], 3000)))
         .run()
         .await?;
@@ -111,7 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 See:
 - `docs/fastapi-like-builder.md`
 - `examples/simple-server/src/main.rs`
-- `examples/renamed-alloy-app/src/main.rs` (dependency-rename-safe macro usage)
+- `examples/renamed-meld-app/src/main.rs` (dependency-rename-safe macro usage)
 
 ## gRPC Contract Doc Generation
 
@@ -149,4 +149,4 @@ Core roadmap items are implemented:
 - `#19` descriptor-based gRPC docs generator complete
 
 Follow-up improvements continue via GitHub issues on:
-[jaeyoung0509/alloy](https://github.com/jaeyoung0509/alloy)
+[jaeyoung0509/meld](https://github.com/jaeyoung0509/meld)

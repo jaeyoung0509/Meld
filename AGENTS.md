@@ -1,11 +1,11 @@
-# Alloy Agent Playbook
+# Meld Agent Playbook
 
 This document is the working contract for contributors and AI agents in this repository.
 It consolidates what we already know, what we are building next, and how to execute safely.
 
 ## 1) Product Direction
 
-Build an Alloy framework in Rust that supports:
+Build a Meld framework in Rust that supports:
 - REST API on HTTP/1.1 (`axum` + `serde`)
 - gRPC API on HTTP/2 (`tonic` + `prost`)
 - Single-port serving for REST + gRPC
@@ -23,9 +23,9 @@ Build an Alloy framework in Rust that supports:
 ## 3) Architecture Baseline
 
 Recommended workspace layout:
-- `crates/alloy-core`: domain, state, errors, shared traits
-- `crates/alloy-rpc`: `.proto`, `build.rs`, generated gRPC bindings
-- `crates/alloy-server`: startup, routing, middleware, serving
+- `crates/meld-core`: domain, state, errors, shared traits
+- `crates/meld-rpc`: `.proto`, `build.rs`, generated gRPC bindings
+- `crates/meld-server`: startup, routing, middleware, serving
 - `examples/simple-server`: minimal runnable example
 
 Dependency baseline (subject to exact lockfile decisions):
@@ -38,7 +38,7 @@ Dependency baseline (subject to exact lockfile decisions):
 
 ## 4) Issue Roadmap (GitHub)
 
-Tracking repository: `https://github.com/jaeyoung0509/alloy`
+Tracking repository: `https://github.com/jaeyoung0509/meld`
 
 Issue source-of-truth policy:
 - GitHub Issues are the canonical source of backlog truth.
@@ -46,15 +46,15 @@ Issue source-of-truth policy:
 - Pull issue context with `gh issue` commands (or issue-fetch skill) when planning/implementing work.
 
 Open issues:
-- #1 Scaffold Rust Workspace (alloy-core / alloy-rpc / alloy-server)
-- #2 Define Shared Domain/Error/AppState in alloy-core
-- #3 Build gRPC Proto + Codegen Pipeline (alloy-rpc)
-- #4 Bootstrap alloy-server and Implement REST Health Endpoint
+- #1 Scaffold Rust Workspace (meld-core / meld-rpc / meld-server)
+- #2 Define Shared Domain/Error/AppState in meld-core
+- #3 Build gRPC Proto + Codegen Pipeline (meld-rpc)
+- #4 Bootstrap meld-server and Implement REST Health Endpoint
 - #5 Implement Single-Port REST + gRPC Multiplexing
 - #6 Apply Shared Middleware and Observability
 - #7 Generate OpenAPI/Swagger for REST Endpoints
 - #8 Bridge gRPC Contracts to Human-Readable API Docs
-- #9 Design FastAPI-Like Alloy Builder API
+- #9 Design FastAPI-Like Meld Builder API
 - #10 Add End-to-End Tests and CI
 
 Execution order should default to:
@@ -109,9 +109,9 @@ Workspace setup and validation:
 - `cargo test --workspace`
 
 GitHub issue operations:
-- List: `gh issue list --repo jaeyoung0509/alloy --limit 50`
-- View: `gh issue view <number> --repo jaeyoung0509/alloy`
-- JSON detail: `gh issue view <number> --repo jaeyoung0509/alloy --json number,title,body,labels,assignees`
+- List: `gh issue list --repo jaeyoung0509/meld --limit 50`
+- View: `gh issue view <number> --repo jaeyoung0509/meld`
+- JSON detail: `gh issue view <number> --repo jaeyoung0509/meld --json number,title,body,labels,assignees`
 
 Local protocol checks (when server is running):
 - REST health: `curl http://localhost:3000/health`

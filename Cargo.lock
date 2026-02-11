@@ -18,67 +18,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alloy-core"
-version = "0.1.0"
-dependencies = [
- "jsonwebtoken",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "alloy-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "alloy-rpc"
-version = "0.1.0"
-dependencies = [
- "alloy-core",
- "prost",
- "prost-types",
- "protoc-bin-vendored",
- "serde_json",
- "tempfile",
- "tonic",
- "tonic-build",
-]
-
-[[package]]
-name = "alloy-server"
-version = "0.1.0"
-dependencies = [
- "alloy-core",
- "alloy-macros",
- "alloy-rpc",
- "axum",
- "futures-util",
- "http",
- "jsonwebtoken",
- "pulldown-cmark",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite",
- "tonic",
- "tower 0.5.3",
- "tower-http 0.5.2",
- "tracing",
- "tracing-subscriber",
- "utoipa",
- "utoipa-swagger-ui",
- "validator",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1175,6 +1114,67 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
 
 [[package]]
+name = "meld-core"
+version = "0.1.0"
+dependencies = [
+ "jsonwebtoken",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "meld-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "meld-rpc"
+version = "0.1.0"
+dependencies = [
+ "meld-core",
+ "prost",
+ "prost-types",
+ "protoc-bin-vendored",
+ "serde_json",
+ "tempfile",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
+name = "meld-server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "http",
+ "jsonwebtoken",
+ "meld-core",
+ "meld-macros",
+ "meld-rpc",
+ "pulldown-cmark",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "tonic",
+ "tower 0.5.3",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-swagger-ui",
+ "validator",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1789,11 +1789,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a96887878f22d7bad8a3b6dc5b7440e0ada9a245242924394987b21cf2210a4c"
 
 [[package]]
-name = "renamed-alloy-app"
+name = "renamed-meld-app"
 version = "0.1.0"
 dependencies = [
- "alloy-server",
  "axum",
+ "meld-server",
  "serde",
  "serde_json",
  "tokio",
@@ -2160,10 +2160,10 @@ checksum = "e320a6c5ad31d271ad523dcf3ad13e2767ad8b1cb8f047f75a8aeaf8da139da2"
 name = "simple-server"
 version = "0.1.0"
 dependencies = [
- "alloy-core",
- "alloy-server",
  "axum",
  "futures-util",
+ "meld-core",
+ "meld-server",
  "serde",
  "serde_json",
  "tokio",

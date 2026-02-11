@@ -1,4 +1,4 @@
-name: Alloy CI
+name: Meld CI
 
 on:
   pull_request:
@@ -46,7 +46,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run multiplexing integration test
-        run: cargo test -p alloy-server --test multiplexing -- --nocapture
+        run: cargo test -p meld-server --test multiplexing -- --nocapture
 
   docs-contract:
     name: Docs Contract Drift Check
@@ -67,7 +67,7 @@ jobs:
         run: ./scripts/check_grpc_contract_docs.sh
 
       - name: Verify OpenAPI route test
-        run: cargo test -p alloy-server openapi_json_is_available -- --nocapture
+        run: cargo test -p meld-server openapi_json_is_available -- --nocapture
 
   security-audit:
     name: Security Audit
