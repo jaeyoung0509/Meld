@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `meld_server::prelude::*` includes:
 - `MeldServer`
-- `route` macro
+- `route` and `dto` macros
 - common validation extractors (`ValidatedJson`, `ValidatedQuery`, `ValidatedPath`, `ValidatedParts`)
 - `Depends` DI extractor
 
@@ -37,7 +37,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## DTO And Dependency Injection Pattern
 
-You can model FastAPI-like DTOs with `serde` and inject shared dependencies using `State<Arc<AppState>>`.
+You can model FastAPI-like DTOs with `#[meld_server::dto]` and inject shared dependencies using `State<Arc<AppState>>`.
+
+`dto` requirements:
+- `utoipa` must be available in the crate dependencies (for `ToSchema` derive expansion)
+- `validator` field attributes (such as `#[validate(...)]`) are supported directly
 
 ```rust
 use std::sync::Arc;
@@ -47,20 +51,20 @@ use axum::{
     extract::{Path, Query, State},
     Json,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-#[derive(Deserialize)]
+#[meld_server::dto]
 struct NotePath {
     id: String,
 }
 
-#[derive(Deserialize)]
+#[meld_server::dto]
 struct NoteQuery {
     q: Option<String>,
     limit: Option<u32>,
 }
 
-#[derive(Deserialize)]
+#[meld_server::dto]
 struct CreateNoteBody {
     title: String,
 }
@@ -94,9 +98,7 @@ Typical usage:
 
 ```rust
 use meld_server::api::{ApiError, ValidatedJson};
-use validator::Validate;
-
-#[derive(serde::Deserialize, Validate)]
+#[meld_server::dto]
 struct CreateNoteBody {
     #[validate(length(min = 2, max = 120))]
     title: String,
@@ -112,7 +114,8 @@ async fn create_note(
 Validation failures return a structured `400` error JSON with:
 - `code`
 - `message`
-- `details` (field-level messages)
+- `detail` (FastAPI-like issue list with `loc`, `msg`, `type`)
+- `details` (legacy field-level map kept for compatibility)
 
 OpenAPI wiring:
 - shared error schema uses `ApiErrorResponse`
@@ -146,7 +149,7 @@ that implements `Validate`.
 
 Macro portability:
 - `#[route(...)]` expansion is dependency-rename safe.
-- Example compile coverage exists under `examples/renamed-meld-app`.
+- Example compile coverage exists under `examples/meld-app`.
 
 ## SSE Endpoint Pattern
 
@@ -254,8 +257,86 @@ async fn handler(Depends(info): Depends<ServiceInfo>) -> String {
 
 Test override helper:
 - `meld_server::di::with_dependency_override(router, value)`
+- `meld_server::di::with_dependency(router, value)`
+- `meld_server::di::with_dependency_overrides(router, overrides)`
+- `MeldServer::with_dependency(value)`
 
 ## Notes
 
 - Default `MeldServer::new()` enables both REST and gRPC on a single listener.
 - Default address uses `MELD_SERVER_ADDR` if set, otherwise `127.0.0.1:3000`.
+
+## gRPC Quickstart (No-Auth + Auth)
+
+Prerequisites:
+- `grpcurl` for local gRPC calls
+- `python3` for dev-token generation script
+
+Start server (default no-auth):
+
+```bash
+cargo run -p meld-server
+```
+
+No-auth smoke tests:
+
+```bash
+grpcurl -plaintext 127.0.0.1:3000 list
+grpcurl -plaintext \
+  -import-path crates/meld-rpc/proto \
+  -proto service.proto \
+  -d '{"name":"Rust"}' \
+  127.0.0.1:3000 \
+  meld.v1.Greeter/SayHello
+```
+
+Enable auth (restart server):
+
+```bash
+MELD_AUTH_ENABLED=true \
+MELD_AUTH_JWT_SECRET=dev-secret \
+MELD_AUTH_ISSUER=https://issuer.local \
+MELD_AUTH_AUDIENCE=meld-api \
+cargo run -p meld-server
+```
+
+Expected failure without token:
+
+```bash
+grpcurl -plaintext \
+  -import-path crates/meld-rpc/proto \
+  -proto service.proto \
+  -d '{"name":"Rust"}' \
+  127.0.0.1:3000 \
+  meld.v1.Greeter/SayHello
+```
+
+Expected outcome:
+- gRPC status code: `UNAUTHENTICATED`
+- Typical message: `missing bearer token`
+
+Generate a development token (dev-only helper):
+
+```bash
+TOKEN=$(python3 scripts/generate_dev_jwt.py \
+  --secret dev-secret \
+  --issuer https://issuer.local \
+  --audience meld-api)
+```
+
+Expected success with token:
+
+```bash
+grpcurl -plaintext \
+  -H "authorization: Bearer ${TOKEN}" \
+  -import-path crates/meld-rpc/proto \
+  -proto service.proto \
+  -d '{"name":"Rust"}' \
+  127.0.0.1:3000 \
+  meld.v1.Greeter/SayHello
+```
+
+Common auth mismatch outcomes:
+- wrong `--secret` / `MELD_AUTH_JWT_SECRET`: `UNAUTHENTICATED`
+- wrong `--issuer` / `MELD_AUTH_ISSUER`: `UNAUTHENTICATED`
+- wrong `--audience` / `MELD_AUTH_AUDIENCE`: `UNAUTHENTICATED`

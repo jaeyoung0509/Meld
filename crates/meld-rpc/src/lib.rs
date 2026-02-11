@@ -4,6 +4,8 @@ pub mod proto {
     tonic::include_proto!("meld.v1");
 }
 
+pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("meld_descriptor");
+
 pub use proto::greeter_client::GreeterClient;
 pub use proto::greeter_server::{Greeter, GreeterServer};
 pub use proto::{HelloRequest, HelloResponse};

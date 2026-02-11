@@ -16,15 +16,14 @@ use meld_server::{
 };
 use serde::{Deserialize, Serialize};
 use tokio_stream::{once, wrappers::IntervalStream, Stream, StreamExt};
-use validator::Validate;
 
-#[derive(Debug, Deserialize, Validate)]
+#[meld_server::dto]
 struct NotePath {
     #[validate(length(min = 3))]
     id: String,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[meld_server::dto]
 struct NoteQuery {
     #[validate(length(max = 80))]
     q: Option<String>,
@@ -32,7 +31,7 @@ struct NoteQuery {
     limit: Option<u32>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[meld_server::dto]
 struct CreateNoteBody {
     #[validate(length(min = 2, max = 120))]
     title: String,
@@ -159,7 +158,7 @@ fn note_event_stream() -> impl Stream<Item = Result<Event, Infallible>> {
     let mut sequence = 0u64;
     let ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(2))).map(move |_| {
         sequence += 1;
-        let kind = if sequence % 5 == 0 {
+        let kind = if sequence.checked_rem(5) == Some(0) {
             "heartbeat"
         } else {
             "note"
@@ -307,6 +306,10 @@ mod tests {
         let parsed: meld_server::api::ApiErrorResponse =
             serde_json::from_slice(&body).expect("api error json");
         assert_eq!(parsed.code, "validation_error");
+        let detail = parsed.detail.expect("validation detail should exist");
+        assert!(detail
+            .iter()
+            .any(|issue| issue.loc.first() == Some(&"body".to_string())));
     }
 
     #[tokio::test]
@@ -354,6 +357,10 @@ mod tests {
         let parsed: meld_server::api::ApiErrorResponse =
             serde_json::from_slice(&body).expect("api error json");
         assert_eq!(parsed.code, "validation_error");
+        let detail = parsed.detail.expect("validation detail should exist");
+        assert!(detail
+            .iter()
+            .any(|issue| issue.loc.first() == Some(&"query".to_string())));
     }
 
     #[tokio::test]
@@ -376,6 +383,10 @@ mod tests {
         let parsed: meld_server::api::ApiErrorResponse =
             serde_json::from_slice(&body).expect("api error json");
         assert_eq!(parsed.code, "validation_error");
+        let detail = parsed.detail.expect("validation detail should exist");
+        assert!(detail
+            .iter()
+            .any(|issue| issue.loc.first() == Some(&"path".to_string())));
     }
 
     #[tokio::test]

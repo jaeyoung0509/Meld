@@ -113,6 +113,7 @@ impl AuthRejection {
                 Json(ApiErrorResponse {
                     code: "unauthorized".to_string(),
                     message: "missing bearer token".to_string(),
+                    detail: None,
                     details: None,
                 }),
             )
@@ -122,6 +123,7 @@ impl AuthRejection {
                 Json(ApiErrorResponse {
                     code: "unauthorized".to_string(),
                     message,
+                    detail: None,
                     details: None,
                 }),
             )
@@ -131,6 +133,7 @@ impl AuthRejection {
                 Json(ApiErrorResponse {
                     code: "internal_error".to_string(),
                     message,
+                    detail: None,
                     details: None,
                 }),
             )

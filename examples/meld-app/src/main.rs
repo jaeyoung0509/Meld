@@ -1,15 +1,13 @@
 use axum::{Json, Router};
 use meld::prelude::*;
-use serde::Deserialize;
-use validator::Validate;
 
-#[derive(Debug, Deserialize, Validate)]
+#[meld::dto]
 struct Payload {
     #[validate(length(min = 1, max = 40))]
     name: String,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[meld::dto]
 struct ItemPath {
     #[validate(length(min = 3))]
     id: String,
@@ -54,7 +52,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn renamed_dependency_macro_validates_path() {
+    async fn dependency_macro_validates_path() {
         let response = app()
             .oneshot(
                 Request::builder()
@@ -72,5 +70,9 @@ mod tests {
             .expect("body bytes");
         let parsed: ApiErrorResponse = serde_json::from_slice(&body).expect("error response json");
         assert_eq!(parsed.code, "validation_error");
+        let detail = parsed.detail.expect("validation detail should exist");
+        assert!(detail
+            .iter()
+            .any(|issue| issue.loc.first() == Some(&"path".to_string())));
     }
 }

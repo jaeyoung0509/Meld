@@ -2,10 +2,12 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use proc_macro_crate::{crate_name, FoundCrate};
 use quote::quote;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
-    parse::Parse, parse_macro_input, parse_quote, Error, FnArg, GenericArgument, Ident, ItemFn,
-    LitStr, Pat, PatTupleStruct, PathArguments, PathSegment, Token, Type,
+    parse::Parse, parse_macro_input, parse_quote, Attribute, Error, FnArg, GenericArgument, Ident,
+    Item, ItemEnum, ItemFn, ItemStruct, LitStr, Pat, PatTupleStruct, PathArguments, PathSegment,
+    Token, Type,
 };
 
 struct RouteArgs {
@@ -120,6 +122,38 @@ pub fn route(args: TokenStream, item: TokenStream) -> TokenStream {
     TokenStream::from(quote! { #item_fn })
 }
 
+#[proc_macro_attribute]
+pub fn dto(args: TokenStream, item: TokenStream) -> TokenStream {
+    if !args.is_empty() {
+        return Error::new(
+            Span::call_site(),
+            "`#[dto]` does not accept arguments; use it as `#[dto]`",
+        )
+        .to_compile_error()
+        .into();
+    }
+
+    let mut item = parse_macro_input!(item as Item);
+    let meld_crate = match resolve_meld_server_path() {
+        Ok(path) => path,
+        Err(err) => return err.to_compile_error().into(),
+    };
+
+    let apply_result = match &mut item {
+        Item::Struct(ItemStruct { attrs, .. }) => ensure_dto_derives(attrs, &meld_crate),
+        Item::Enum(ItemEnum { attrs, .. }) => ensure_dto_derives(attrs, &meld_crate),
+        _ => Err(Error::new(
+            item.span(),
+            "`#[dto]` can only be used on structs or enums",
+        )),
+    };
+
+    match apply_result {
+        Ok(()) => TokenStream::from(quote!(#item)),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
 fn resolve_meld_server_path() -> syn::Result<syn::Path> {
     let found = crate_name("meld-server").or_else(|_| crate_name("alloy-server"));
     match found {
@@ -135,6 +169,56 @@ fn resolve_meld_server_path() -> syn::Result<syn::Path> {
              ensure `meld-server` (or legacy `alloy-server`) is present in Cargo.toml dependencies",
         )),
     }
+}
+
+fn ensure_dto_derives(attrs: &mut Vec<Attribute>, meld_crate: &syn::Path) -> syn::Result<()> {
+    let required: [syn::Path; 3] = [
+        parse_quote!(#meld_crate::serde::Deserialize),
+        parse_quote!(#meld_crate::validator::Validate),
+        parse_quote!(#meld_crate::utoipa::ToSchema),
+    ];
+    let mut existing_last_segments = std::collections::BTreeSet::new();
+    let mut first_derive: Option<(usize, Punctuated<syn::Path, Token![,]>)> = None;
+
+    for (idx, attr) in attrs.iter().enumerate() {
+        if !attr.path().is_ident("derive") {
+            continue;
+        }
+
+        let derives = attr.parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated)?;
+        for path in &derives {
+            if let Some(last) = path.segments.last() {
+                existing_last_segments.insert(last.ident.to_string());
+            }
+        }
+        if first_derive.is_none() {
+            first_derive = Some((idx, derives));
+        }
+    }
+
+    let mut missing = Vec::new();
+    for path in required {
+        if let Some(last) = path.segments.last() {
+            if !existing_last_segments.contains(&last.ident.to_string()) {
+                missing.push(path);
+            }
+        }
+    }
+
+    if missing.is_empty() {
+        return Ok(());
+    }
+
+    if let Some((idx, mut derive_paths)) = first_derive {
+        for path in missing {
+            derive_paths.push(path);
+        }
+        attrs[idx] = parse_quote!(#[derive(#derive_paths)]);
+    } else {
+        attrs.insert(0, parse_quote!(#[derive(#(#missing),*)]));
+    }
+
+    Ok(())
 }
 
 fn apply_auto_validate(item_fn: &mut ItemFn, meld_crate: &syn::Path) -> syn::Result<()> {
@@ -456,6 +540,42 @@ mod tests {
 
         let rendered = quote!(#path).to_string();
         assert_eq!(rendered, ":: meld_api");
+    }
+
+    #[test]
+    fn dto_injects_deserialize_validate_and_schema_derives() {
+        let mut item: ItemStruct = parse_quote! {
+            struct Payload {
+                #[validate(length(min = 1))]
+                name: String,
+            }
+        };
+        let meld: syn::Path = parse_quote!(::meld_server);
+        ensure_dto_derives(&mut item.attrs, &meld).expect("dto derives should be injected");
+
+        let rendered = quote!(#item).to_string();
+        assert!(rendered.contains(":: meld_server :: serde :: Deserialize"));
+        assert!(rendered.contains(":: meld_server :: validator :: Validate"));
+        assert!(rendered.contains(":: meld_server :: utoipa :: ToSchema"));
+    }
+
+    #[test]
+    fn dto_keeps_existing_derive_and_appends_missing() {
+        let mut item: ItemStruct = parse_quote! {
+            #[derive(Debug, serde::Deserialize)]
+            struct Payload {
+                #[validate(length(min = 1))]
+                name: String,
+            }
+        };
+        let meld: syn::Path = parse_quote!(::meld_server);
+        ensure_dto_derives(&mut item.attrs, &meld).expect("dto derives should be injected");
+
+        let rendered = quote!(#item).to_string();
+        assert!(rendered.contains("Debug"));
+        assert!(rendered.contains("serde :: Deserialize"));
+        assert!(rendered.contains(":: meld_server :: validator :: Validate"));
+        assert!(rendered.contains(":: meld_server :: utoipa :: ToSchema"));
     }
 
     fn arg_type_ident(arg: &FnArg) -> Option<String> {

@@ -7,7 +7,7 @@ use tokio::net::TcpListener;
 use tonic::{body::BoxBody, server::NamedService, service::Routes};
 use tower::Service;
 
-use crate::{build_router, grpc, middleware};
+use crate::{build_router, di, grpc, middleware};
 
 type RouterCustomizer = Box<dyn Fn(Router) -> Router + Send + Sync + 'static>;
 type StartupHook = Box<dyn Fn(SocketAddr) + Send + Sync + 'static>;
@@ -18,6 +18,7 @@ pub struct MeldServer {
     addr: SocketAddr,
     rest_router: Option<Router>,
     grpc_routes: Option<Routes>,
+    dependency_overrides: di::DependencyOverrides,
     middleware_config: middleware::MiddlewareConfig,
     middleware_customizers: Vec<RouterCustomizer>,
     startup_hooks: Vec<StartupHook>,
@@ -28,10 +29,11 @@ impl MeldServer {
     pub fn new() -> Self {
         let state = Arc::new(AppState::local("meld-server"));
         Self {
-            grpc_routes: Some(Routes::new(grpc::build_grpc_service(state.clone())).prepare()),
+            grpc_routes: Some(grpc::build_grpc_routes(state.clone())),
             state,
             addr: load_addr_from_env().unwrap_or(SocketAddr::from(([127, 0, 0, 1], 3000))),
             rest_router: None,
+            dependency_overrides: di::DependencyOverrides::default(),
             middleware_config: middleware::MiddlewareConfig::from_env(),
             middleware_customizers: Vec::new(),
             startup_hooks: Vec::new(),
@@ -51,6 +53,14 @@ impl MeldServer {
 
     pub fn with_rest_router(mut self, router: Router) -> Self {
         self.rest_router = Some(router);
+        self
+    }
+
+    pub fn with_dependency<T>(mut self, value: T) -> Self
+    where
+        T: Clone + Send + Sync + 'static,
+    {
+        self.dependency_overrides = self.dependency_overrides.with(value);
         self
     }
 
@@ -121,6 +131,7 @@ impl MeldServer {
         };
 
         let app = middleware::apply_shared_middleware(merged, &self.middleware_config);
+        let app = di::with_dependency_overrides(app, self.dependency_overrides.clone());
         self.middleware_customizers
             .iter()
             .fold(app, |acc, customizer| customizer(acc))
@@ -174,7 +185,9 @@ fn read_env_with_fallback(primary: &str, legacy: &str) -> Result<String, env::Va
 mod tests {
     use super::*;
     use axum::{
+        body::to_bytes,
         body::Body,
+        extract::FromRef,
         http::{Request, StatusCode},
         routing::get,
     };
@@ -209,5 +222,41 @@ mod tests {
             .await
             .expect("ping request should succeed");
         assert_eq!(ping_response.status(), StatusCode::OK);
+    }
+
+    #[derive(Clone)]
+    struct LabelDep(String);
+
+    impl FromRef<Arc<AppState>> for LabelDep {
+        fn from_ref(_state: &Arc<AppState>) -> Self {
+            Self("from-state".to_string())
+        }
+    }
+
+    async fn dep_handler(crate::di::Depends(dep): crate::di::Depends<LabelDep>) -> String {
+        dep.0
+    }
+
+    #[tokio::test]
+    async fn builder_supports_dependency_overrides() {
+        let app = MeldServer::new()
+            .without_grpc()
+            .with_rest_router(
+                Router::new()
+                    .route("/dep", get(dep_handler))
+                    .with_state(Arc::new(AppState::local("builder-test"))),
+            )
+            .with_dependency(LabelDep("override".to_string()))
+            .build_app();
+
+        let response = app
+            .oneshot(Request::builder().uri("/dep").body(Body::empty()).unwrap())
+            .await
+            .expect("dep request should succeed");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("response body");
+        assert_eq!(String::from_utf8(body.to_vec()).expect("utf8"), "override");
     }
 }
