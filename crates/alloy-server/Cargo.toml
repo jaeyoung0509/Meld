@@ -9,6 +9,7 @@ alloy-core = { path = "../alloy-core" }
 alloy-macros = { path = "../alloy-macros" }
 alloy-rpc = { path = "../alloy-rpc" }
 axum.workspace = true
+futures-util.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 tonic.workspace = true
@@ -25,3 +26,4 @@ validator.workspace = true
 
 [dev-dependencies]
 reqwest.workspace = true
+tokio-tungstenite.workspace = true

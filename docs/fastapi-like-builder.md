@@ -164,6 +164,29 @@ Client reconnect guidance:
 - Add small jitter to avoid synchronized reconnect spikes.
 - Resume with `Last-Event-ID` when your client stack supports it.
 
+## WebSocket Endpoint Pattern
+
+Alloy supports WebSocket upgrade handlers for bidirectional realtime flows.
+
+```rust
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use futures_util::SinkExt;
+
+async fn ws_echo(ws: WebSocketUpgrade) -> impl axum::response::IntoResponse {
+    ws.max_message_size(4096).on_upgrade(handle_ws)
+}
+
+async fn handle_ws(mut socket: WebSocket) {
+    while let Some(Ok(Message::Text(text))) = socket.recv().await {
+        let _ = socket.send(Message::Text(format!("echo: {text}"))).await;
+    }
+}
+```
+
+Server defaults in `alloy-server`:
+- max text frame bytes: `ALLOY_WS_MAX_TEXT_BYTES` (default `4096`)
+- idle timeout seconds: `ALLOY_WS_IDLE_TIMEOUT_SECS` (default `45`)
+
 ## Depends-Like Extractor Pattern
 
 For FastAPI `Depends(...)` style injection, define a custom extractor via `FromRequestParts`.
