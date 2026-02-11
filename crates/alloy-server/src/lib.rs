@@ -8,6 +8,9 @@ use axum::{
     routing::get,
     Router,
 };
+use tonic::service::Routes;
+
+pub mod grpc;
 
 pub fn build_router(state: Arc<AppState>) -> Router {
     Router::new()
@@ -15,6 +18,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/health", get(health))
         .route("/hello/:name", get(hello))
         .with_state(state)
+}
+
+pub fn build_multiplexed_router(state: Arc<AppState>) -> Router {
+    let rest = build_router(state.clone());
+    let grpc = Routes::new(grpc::build_grpc_service(state))
+        .prepare()
+        .into_axum_router();
+
+    rest.merge(grpc)
 }
 
 async fn root(State(state): State<Arc<AppState>>) -> String {

@@ -1,7 +1,7 @@
 use std::{env, net::SocketAddr, sync::Arc};
 
 use alloy_core::AppState;
-use alloy_server::build_router;
+use alloy_server::build_multiplexed_router;
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let state = Arc::new(AppState::local("alloy-server"));
 
-    let app = build_router(state).layer(TraceLayer::new_for_http());
+    let app = build_multiplexed_router(state).layer(TraceLayer::new_for_http());
     let addr = load_addr_from_env()?;
     let listener = TcpListener::bind(addr).await?;
 
