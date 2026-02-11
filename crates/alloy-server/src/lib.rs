@@ -19,6 +19,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 pub mod builder;
+pub mod api;
 pub mod grpc;
 pub mod middleware;
 pub use builder::AlloyServer;

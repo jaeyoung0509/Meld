@@ -76,6 +76,43 @@ async fn get_note(
 
 See `/examples/simple-server/src/main.rs` for a runnable end-to-end example using these DTO styles.
 
+## Validation And Error DTO Pattern
+
+Alloy now includes reusable REST validation helpers:
+
+- `alloy_server::api::ValidatedJson<T>`
+- `alloy_server::api::ValidatedQuery<T>`
+- `alloy_server::api::ApiErrorResponse`
+
+Typical usage:
+
+```rust
+use alloy_server::api::{ApiError, ValidatedJson};
+use validator::Validate;
+
+#[derive(serde::Deserialize, Validate)]
+struct CreateNoteBody {
+    #[validate(length(min = 2, max = 120))]
+    title: String,
+}
+
+async fn create_note(
+    ValidatedJson(body): ValidatedJson<CreateNoteBody>,
+) -> Result<axum::Json<String>, ApiError> {
+    Ok(axum::Json(body.title))
+}
+```
+
+Validation failures return a structured `400` error JSON with:
+- `code`
+- `message`
+- `details` (field-level messages)
+
+## Depends-Like Extractor Pattern
+
+For FastAPI `Depends(...)` style injection, define a custom extractor via `FromRequestParts`.
+See `RequestContext` in `/examples/simple-server/src/main.rs` for a practical pattern.
+
 ## Notes
 
 - Default `AlloyServer::new()` enables both REST and gRPC on a single listener.
