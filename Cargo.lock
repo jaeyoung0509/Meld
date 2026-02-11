@@ -31,7 +31,10 @@ version = "0.1.0"
 dependencies = [
  "alloy-core",
  "prost",
+ "prost-types",
  "protoc-bin-vendored",
+ "serde_json",
+ "tempfile",
  "tonic",
  "tonic-build",
 ]
@@ -1613,6 +1616,7 @@ dependencies = [
  "alloy-core",
  "alloy-server",
  "axum",
+ "serde",
  "tokio",
 ]
 
