@@ -187,6 +187,23 @@ Server defaults in `alloy-server`:
 - max text frame bytes: `ALLOY_WS_MAX_TEXT_BYTES` (default `4096`)
 - idle timeout seconds: `ALLOY_WS_IDLE_TIMEOUT_SECS` (default `45`)
 
+## OAuth2/OIDC JWT Auth Pattern
+
+Alloy includes shared JWT claim validation used by both REST and gRPC layers.
+
+Environment configuration:
+- `ALLOY_AUTH_ENABLED=true`
+- `ALLOY_AUTH_JWT_SECRET=<hmac-secret>`
+- optional: `ALLOY_AUTH_ISSUER=<issuer>`
+- optional: `ALLOY_AUTH_AUDIENCE=<audience>`
+
+When enabled:
+- REST protected route example: `GET /protected/whoami` (Bearer token required)
+- gRPC interceptor validates `authorization: Bearer <token>` metadata
+
+When disabled:
+- existing baseline routes continue without auth enforcement.
+
 ## Depends-Like Extractor Pattern
 
 For FastAPI `Depends(...)` style injection, define a custom extractor via `FromRequestParts`.

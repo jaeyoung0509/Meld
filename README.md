@@ -17,6 +17,8 @@ Alloy is a Rust server framework focused on **FastAPI-like developer ergonomics*
   - `/events`
 - REST WebSocket echo:
   - `/ws`
+- Optional REST auth-protected route:
+  - `/protected/whoami`
 - Fluent server builder API:
   - `AlloyServer::new().with_...().run()`
 - Shared middleware stack:
@@ -49,6 +51,13 @@ curl -N http://127.0.0.1:3000/events
 WebSocket defaults:
 - max text frame: `4096` bytes (`ALLOY_WS_MAX_TEXT_BYTES`)
 - idle timeout: `45` seconds (`ALLOY_WS_IDLE_TIMEOUT_SECS`)
+
+Auth defaults:
+- disabled by default (`ALLOY_AUTH_ENABLED=false`)
+- when enabled, JWT HMAC secret required (`ALLOY_AUTH_JWT_SECRET`)
+- optional issuer/audience checks:
+  - `ALLOY_AUTH_ISSUER`
+  - `ALLOY_AUTH_AUDIENCE`
 
 ### 3) Open docs
 
