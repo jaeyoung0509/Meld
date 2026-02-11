@@ -18,8 +18,10 @@ use tonic::service::Routes;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+pub mod builder;
 pub mod grpc;
 pub mod middleware;
+pub use builder::AlloyServer;
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct RootResponse {

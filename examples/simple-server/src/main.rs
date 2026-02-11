@@ -1,14 +1,12 @@
-use std::sync::Arc;
+use std::net::SocketAddr;
 
-use alloy_core::AppState;
-use alloy_server::build_router;
-use tokio::net::TcpListener;
+use alloy_server::AlloyServer;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(AppState::local("simple-server"));
-    let app = build_router(state);
-    let listener = TcpListener::bind(("127.0.0.1", 4000)).await?;
-    axum::serve(listener, app).await?;
+    AlloyServer::new()
+        .with_addr(SocketAddr::from(([127, 0, 0, 1], 4000)))
+        .run()
+        .await?;
     Ok(())
 }
