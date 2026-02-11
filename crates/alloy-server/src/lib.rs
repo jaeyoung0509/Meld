@@ -31,6 +31,7 @@ pub mod grpc;
 pub mod middleware;
 pub use alloy_macros::route;
 pub use builder::AlloyServer;
+use crate::api::ApiErrorResponse;
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct RootResponse {
@@ -68,7 +69,8 @@ struct ServerSentEventPayload {
         RootResponse,
         HealthResponse,
         HelloRestResponse,
-        ProtectedWhoAmIResponse
+        ProtectedWhoAmIResponse,
+        ApiErrorResponse
     )),
     tags(
         (name = "rest", description = "Alloy REST endpoints")
@@ -156,8 +158,8 @@ async fn health(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
     ),
     responses(
         (status = 200, description = "Hello response", body = HelloRestResponse),
-        (status = 400, description = "Validation error"),
-        (status = 500, description = "Internal error")
+        (status = 400, description = "Validation error", body = ApiErrorResponse),
+        (status = 500, description = "Internal error", body = ApiErrorResponse)
     )
 )]
 async fn hello(
@@ -176,7 +178,7 @@ async fn hello(
     tag = "rest",
     responses(
         (status = 200, description = "Authenticated principal", body = ProtectedWhoAmIResponse),
-        (status = 401, description = "Unauthorized")
+        (status = 401, description = "Unauthorized", body = ApiErrorResponse)
     )
 )]
 async fn protected_whoami(
@@ -395,6 +397,8 @@ mod tests {
         let body_text = String::from_utf8(bytes.to_vec()).expect("valid utf8");
         assert!(body_text.contains("/health"));
         assert!(body_text.contains("/hello/{name}"));
+        assert!(body_text.contains("/protected/whoami"));
+        assert!(body_text.contains("ApiErrorResponse"));
     }
 
     #[tokio::test]

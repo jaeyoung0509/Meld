@@ -108,6 +108,10 @@ Validation failures return a structured `400` error JSON with:
 - `message`
 - `details` (field-level messages)
 
+OpenAPI wiring:
+- shared error schema uses `ApiErrorResponse`
+- REST path annotations can reference the same response body for `400/401/500`
+
 ## Auto-Validate Route Macro (FastAPI-Like DX)
 
 For a more FastAPI-like handler style, use `#[alloy_server::route(..., auto_validate)]`.
@@ -115,6 +119,7 @@ For a more FastAPI-like handler style, use `#[alloy_server::route(..., auto_vali
 With `auto_validate`, handler arguments are rewritten at compile time:
 - `Json<T>` -> `ValidatedJson<T>`
 - `Query<T>` -> `ValidatedQuery<T>`
+- `Path<T>` -> `ValidatedPath<T>`
 
 Example:
 
@@ -129,6 +134,9 @@ async fn create_note(Json(body): Json<CreateNoteBody>) -> Result<Json<String>, A
 ```
 
 If you omit `auto_validate`, behavior stays unchanged.
+
+For header/cookie wrapper patterns, use `ValidatedParts<T>` with your custom parts extractor
+that implements `Validate`.
 
 ## SSE Endpoint Pattern
 

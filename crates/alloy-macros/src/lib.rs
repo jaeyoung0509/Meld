@@ -105,6 +105,7 @@ fn rewrite_extractor_type(ty: &mut Box<Type>) -> Option<syn::Path> {
     let rewritten_path: syn::Path = match segment.ident.to_string().as_str() {
         "Json" => parse_quote!(::alloy_server::api::ValidatedJson),
         "Query" => parse_quote!(::alloy_server::api::ValidatedQuery),
+        "Path" => parse_quote!(::alloy_server::api::ValidatedPath),
         _ => return None,
     };
     let rewritten_ty: Type = parse_quote!(#rewritten_path<#inner_ty>);
@@ -192,9 +193,13 @@ mod tests {
     }
 
     #[test]
-    fn auto_validate_rewrites_json_and_query_extractors() {
+    fn auto_validate_rewrites_json_query_and_path_extractors() {
         let mut item_fn: ItemFn = parse_quote! {
-            async fn create_note(Query(q): Query<ListQuery>, Json(body): Json<CreateNote>) {}
+            async fn create_note(
+                Query(q): Query<ListQuery>,
+                Json(body): Json<CreateNote>,
+                Path(path): Path<NotePath>,
+            ) {}
         };
 
         apply_auto_validate(&mut item_fn);
@@ -211,11 +216,19 @@ mod tests {
             .iter()
             .nth(1)
             .expect("second arg should exist");
+        let third = item_fn
+            .sig
+            .inputs
+            .iter()
+            .nth(2)
+            .expect("third arg should exist");
 
         assert_eq!(arg_type_ident(first), Some("ValidatedQuery".to_string()));
         assert_eq!(arg_pat_ident(first), Some("ValidatedQuery".to_string()));
         assert_eq!(arg_type_ident(second), Some("ValidatedJson".to_string()));
         assert_eq!(arg_pat_ident(second), Some("ValidatedJson".to_string()));
+        assert_eq!(arg_type_ident(third), Some("ValidatedPath".to_string()));
+        assert_eq!(arg_pat_ident(third), Some("ValidatedPath".to_string()));
     }
 
     #[test]

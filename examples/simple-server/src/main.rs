@@ -8,7 +8,7 @@ use alloy_server::{
 };
 use axum::{
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
-    extract::{FromRef, FromRequestParts, Path, State},
+    extract::{FromRef, FromRequestParts, State},
     http::request::Parts,
     response::sse::{Event, KeepAlive, Sse},
     routing::get,
@@ -18,8 +18,9 @@ use serde::{Deserialize, Serialize};
 use tokio_stream::{once, wrappers::IntervalStream, Stream, StreamExt};
 use validator::Validate;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 struct NotePath {
+    #[validate(length(min = 3))]
     id: String,
 }
 
@@ -93,11 +94,12 @@ where
     }
 }
 
+#[alloy_server::route(get, "/notes/:id", auto_validate)]
 async fn get_note(
     ctx: RequestContext,
     Depends(service): Depends<ServiceInfo>,
     State(state): State<Arc<AppState>>,
-    Path(path): Path<NotePath>,
+    axum::extract::Path(path): axum::extract::Path<NotePath>,
 ) -> Result<Json<NoteResponse>, ApiError> {
     let title = state
         .greet(&path.id)
@@ -339,6 +341,28 @@ mod tests {
                 Request::builder()
                     .method("GET")
                     .uri("/notes?limit=0")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("request should complete");
+
+        assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body bytes");
+        let parsed: alloy_server::api::ApiErrorResponse =
+            serde_json::from_slice(&body).expect("api error json");
+        assert_eq!(parsed.code, "validation_error");
+    }
+
+    #[tokio::test]
+    async fn invalid_path_returns_structured_400() {
+        let response = app()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/notes/ab")
                     .body(axum::body::Body::empty())
                     .unwrap(),
             )
