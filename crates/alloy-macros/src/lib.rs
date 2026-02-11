@@ -165,7 +165,7 @@ fn maybe_rewrite_typed_arg(arg: &mut syn::PatType, alloy_crate: &syn::Path) -> s
 
     let validated_path = validated_extractor_path(alloy_crate, kind);
     let rewritten_ty: Type = parse_quote!(#validated_path<#inner_ty>);
-    arg.ty = Box::new(rewritten_ty);
+    *arg.ty = rewritten_ty;
 
     rewrite_pattern(&mut arg.pat, kind, &validated_path, &original_segment)
 }
