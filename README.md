@@ -74,6 +74,7 @@ crates/alloy-core     # domain, state, error model
 crates/alloy-rpc      # proto, tonic codegen, grpc-docgen tool
 crates/alloy-server   # REST + gRPC routing, middleware, builder API
 examples/simple-server
+examples/renamed-alloy-app
 docs/
 scripts/
 ```
@@ -98,6 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 See:
 - `docs/fastapi-like-builder.md`
 - `examples/simple-server/src/main.rs`
+- `examples/renamed-alloy-app/src/main.rs` (dependency-rename-safe macro usage)
 
 ## gRPC Contract Doc Generation
 

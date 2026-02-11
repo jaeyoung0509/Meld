@@ -29,9 +29,18 @@ pub mod builder;
 pub mod di;
 pub mod grpc;
 pub mod middleware;
+use crate::api::ApiErrorResponse;
 pub use alloy_macros::route;
 pub use builder::AlloyServer;
-use crate::api::ApiErrorResponse;
+
+pub mod prelude {
+    pub use crate::api::{
+        ApiError, ApiErrorResponse, ValidatedJson, ValidatedParts, ValidatedPath, ValidatedQuery,
+    };
+    pub use crate::di::{with_dependency_override, Depends};
+    pub use crate::route;
+    pub use crate::AlloyServer;
+}
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct RootResponse {
