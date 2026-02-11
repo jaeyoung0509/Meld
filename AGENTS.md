@@ -40,6 +40,11 @@ Dependency baseline (subject to exact lockfile decisions):
 
 Tracking repository: `https://github.com/jaeyoung0509/alloy`
 
+Issue source-of-truth policy:
+- GitHub Issues are the canonical source of backlog truth.
+- Do not maintain issue detail documents under repository `issues/`.
+- Pull issue context with `gh issue` commands (or issue-fetch skill) when planning/implementing work.
+
 Open issues:
 - #1 Scaffold Rust Workspace (alloy-core / alloy-rpc / alloy-server)
 - #2 Define Shared Domain/Error/AppState in alloy-core
@@ -102,6 +107,11 @@ Commit style (recommended):
 Workspace setup and validation:
 - `cargo check --workspace`
 - `cargo test --workspace`
+
+GitHub issue operations:
+- List: `gh issue list --repo jaeyoung0509/alloy --limit 50`
+- View: `gh issue view <number> --repo jaeyoung0509/alloy`
+- JSON detail: `gh issue view <number> --repo jaeyoung0509/alloy --json number,title,body,labels,assignees`
 
 Local protocol checks (when server is running):
 - REST health: `curl http://localhost:3000/health`
