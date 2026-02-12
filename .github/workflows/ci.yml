@@ -63,8 +63,8 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Check generated gRPC docs are up-to-date
-        run: ./scripts/check_grpc_contract_docs.sh
+      - name: Check generated contract artifacts are up-to-date
+        run: ./scripts/check_contracts_bundle.sh
 
       - name: Verify OpenAPI route test
         run: cargo test -p meld-server openapi_json_is_available -- --nocapture

@@ -19,8 +19,8 @@ cargo test --workspace
 echo "[5/7] cargo test -p meld-server --test multiplexing -- --nocapture"
 cargo test -p meld-server --test multiplexing -- --nocapture
 
-echo "[6/7] scripts/check_grpc_contract_docs.sh"
-./scripts/check_grpc_contract_docs.sh
+echo "[6/7] scripts/check_contracts_bundle.sh"
+./scripts/check_contracts_bundle.sh
 
 echo "[7/7] cargo test -p meld-server openapi_json_is_available -- --nocapture"
 cargo test -p meld-server openapi_json_is_available -- --nocapture

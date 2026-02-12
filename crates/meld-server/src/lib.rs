@@ -114,6 +114,15 @@ struct ApiDoc;
 
 struct ApiDocDefaults;
 
+pub fn rest_openapi_document() -> utoipa::openapi::OpenApi {
+    ApiDoc::openapi()
+}
+
+pub fn rest_openapi_json_pretty() -> String {
+    serde_json::to_string_pretty(&rest_openapi_document())
+        .expect("rest openapi should serialize to valid json")
+}
+
 impl Modify for ApiDocDefaults {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         add_docs_discovery_description(openapi);

@@ -14,6 +14,8 @@ Meld is a Rust server framework focused on **FastAPI-like developer ergonomics**
   - `/grpc/contracts` (rendered HTML)
   - `/grpc/contracts.md` (raw markdown)
   - `/grpc/contracts/openapi.json`
+- Unified contract bundle artifact:
+  - `docs/generated/contracts-bundle.json`
 - REST SSE stream:
   - `/events`
 - REST WebSocket echo:
@@ -146,6 +148,7 @@ grpcurl -plaintext \
 crates/meld-core     # domain, state, error model
 crates/meld-rpc      # proto, tonic codegen, grpc-docgen tool
 crates/meld-server   # REST + gRPC routing, middleware, builder API
+contracts/           # explicit REST <-> gRPC mapping definitions
 examples/simple-server
 examples/meld-app
 docs/
@@ -176,19 +179,26 @@ See:
 - `examples/simple-server/src/main.rs`
 - `examples/meld-app/src/main.rs` (dependency-rename-safe macro usage)
 
-## gRPC Contract Doc Generation
+## Contract Artifact Generation
 
 Generate artifacts:
 
 ```bash
-./scripts/generate_grpc_contract_docs.sh
+./scripts/generate_contracts_bundle.sh
 ```
 
 Check drift (used in CI):
 
 ```bash
-./scripts/check_grpc_contract_docs.sh
+./scripts/check_contracts_bundle.sh
 ```
+
+This generates:
+- `contracts/links.toml` (explicit REST <-> gRPC mapping source)
+- `docs/generated/rest-openapi.json`
+- `docs/generated/grpc-contracts.md`
+- `docs/generated/grpc-openapi-bridge.json`
+- `docs/generated/contracts-bundle.json`
 
 ## CI And Local Verification
 
@@ -202,7 +212,7 @@ This runs:
 - `cargo check --workspace`
 - `cargo test --workspace`
 - REST+gRPC multiplexing integration test
-- gRPC docs drift check
+- contract artifact drift check
 - OpenAPI route check
 
 ## Current Status
