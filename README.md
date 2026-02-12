@@ -214,6 +214,27 @@ This runs:
 - REST+gRPC multiplexing integration test
 - contract artifact drift check
 - OpenAPI route check
+- production preflight gate
+
+## Production Readiness Docs
+
+- `docs/production/deployment.md`
+- `docs/production/security.md`
+- `docs/production/observability.md`
+- `docs/production/runbook.md`
+
+Run production preflight locally:
+
+```bash
+MELD_PREFLIGHT_SECURE=true \
+MELD_PREFLIGHT_BOOT_SERVER=true \
+MELD_AUTH_ENABLED=true \
+MELD_AUTH_JWT_SECRET=replace-me \
+MELD_AUTH_ISSUER=https://issuer.local \
+MELD_AUTH_AUDIENCE=meld-api \
+MELD_CORS_ALLOW_ORIGINS=https://app.example.com \
+./scripts/prod_preflight.sh
+```
 
 ## Current Status
 

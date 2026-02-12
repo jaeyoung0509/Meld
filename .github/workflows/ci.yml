@@ -87,3 +87,31 @@ jobs:
 
       - name: Run cargo audit
         run: cargo audit
+
+  prod-preflight:
+    name: Production Preflight
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run production preflight gate
+        env:
+          MELD_PREFLIGHT_SECURE: "true"
+          MELD_PREFLIGHT_BOOT_SERVER: "true"
+          MELD_PREFLIGHT_BASE_URL: "http://127.0.0.1:3000"
+          MELD_AUTH_ENABLED: "true"
+          MELD_AUTH_JWT_SECRET: "ci-dev-secret"
+          MELD_AUTH_ISSUER: "https://issuer.local"
+          MELD_AUTH_AUDIENCE: "meld-api"
+          MELD_CORS_ALLOW_ORIGINS: "https://app.example.com"
+          MELD_TIMEOUT_SECONDS: "15"
+          MELD_REQUEST_BODY_LIMIT_BYTES: "1048576"
+          MELD_MAX_IN_FLIGHT_REQUESTS: "1024"
+        run: ./scripts/prod_preflight.sh
