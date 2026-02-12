@@ -8,6 +8,14 @@ import json
 import sys
 from pathlib import Path
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    try:
+        import tomli as tomllib  # type: ignore[no-redef]
+    except ModuleNotFoundError:
+        tomllib = None  # type: ignore[assignment]
+
 HTTP_METHODS = {"get", "put", "post", "delete", "patch", "options", "head", "trace"}
 
 
@@ -217,7 +225,18 @@ def parse_links_toml(links_path: Path, errors: list[str]) -> dict:
 
 
 def load_links(links_path: Path, errors: list[str]) -> tuple[dict, list[dict]]:
-    raw = parse_links_toml(links_path, errors)
+    raw: dict | None = None
+    if tomllib is not None:
+        with links_path.open("rb") as handle:
+            parsed = tomllib.load(handle)
+        if isinstance(parsed, dict):
+            raw = parsed
+        else:
+            errors.append("links.toml root must be a TOML table")
+            raw = {}
+    else:
+        # Fallback parser for environments without tomllib/tomli (keeps zero-deps local flow).
+        raw = parse_links_toml(links_path, errors)
 
     coverage = raw.get("coverage", {})
     if not isinstance(coverage, dict):
@@ -252,14 +271,88 @@ def as_sorted_string_set(value: object, field_name: str, errors: list[str]) -> l
     return sorted(set(value))
 
 
+def sanitize_repo_relative_path(
+    raw_path: str,
+    repo_root: Path,
+    *,
+    arg_name: str,
+    allowed_root: Path,
+    must_exist: bool,
+) -> Path:
+    candidate = Path(raw_path)
+    if str(candidate) == "":
+        raise ValueError(f"{arg_name} path cannot be empty")
+    if candidate.is_absolute():
+        raise ValueError(f"{arg_name} must be a repo-relative path")
+    if ".." in candidate.parts:
+        raise ValueError(f"{arg_name} cannot contain parent-directory traversal ('..')")
+
+    resolved = (repo_root / candidate).resolve(strict=False)
+    repo_root_resolved = repo_root.resolve()
+    allowed_root_resolved = allowed_root.resolve()
+
+    try:
+        resolved.relative_to(repo_root_resolved)
+    except ValueError as err:
+        raise ValueError(f"{arg_name} escapes repository root") from err
+
+    try:
+        resolved.relative_to(allowed_root_resolved)
+    except ValueError as err:
+        raise ValueError(
+            f"{arg_name} must stay under {allowed_root_resolved.relative_to(repo_root_resolved)}"
+        ) from err
+
+    if must_exist and not resolved.is_file():
+        raise ValueError(f"{arg_name} file does not exist: {resolved}")
+
+    return resolved
+
+
+def to_repo_relative(path: Path, repo_root: Path) -> str:
+    return path.relative_to(repo_root).as_posix()
+
+
 def main() -> int:
     args = parse_args()
     errors: list[str] = []
 
-    rest_path = Path(args.rest_openapi)
-    grpc_path = Path(args.grpc_bridge)
-    links_path = Path(args.links)
-    out_path = Path(args.out)
+    repo_root = Path(__file__).resolve().parent.parent
+    generated_root = repo_root / "docs/generated"
+    contracts_root = repo_root / "contracts"
+
+    try:
+        rest_path = sanitize_repo_relative_path(
+            args.rest_openapi,
+            repo_root,
+            arg_name="--rest-openapi",
+            allowed_root=generated_root,
+            must_exist=True,
+        )
+        grpc_path = sanitize_repo_relative_path(
+            args.grpc_bridge,
+            repo_root,
+            arg_name="--grpc-bridge",
+            allowed_root=generated_root,
+            must_exist=True,
+        )
+        links_path = sanitize_repo_relative_path(
+            args.links,
+            repo_root,
+            arg_name="--links",
+            allowed_root=contracts_root,
+            must_exist=True,
+        )
+        out_path = sanitize_repo_relative_path(
+            args.out,
+            repo_root,
+            arg_name="--out",
+            allowed_root=generated_root,
+            must_exist=False,
+        )
+    except ValueError as err:
+        print(f"error: {err}", file=sys.stderr)
+        return 2
 
     rest_openapi = load_json(rest_path)
     grpc_openapi = load_json(grpc_path)
@@ -393,9 +486,9 @@ def main() -> int:
     bundle = {
         "version": 1,
         "sources": {
-            "rest_openapi": str(rest_path),
-            "grpc_openapi_bridge": str(grpc_path),
-            "links_toml": str(links_path),
+            "rest_openapi": to_repo_relative(rest_path, repo_root),
+            "grpc_openapi_bridge": to_repo_relative(grpc_path, repo_root),
+            "links_toml": to_repo_relative(links_path, repo_root),
         },
         "rest": {
             "operation_count": len(rest_operations),
