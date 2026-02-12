@@ -19,6 +19,9 @@ This project uses focused CI jobs so failures are clearly scoped:
 5. `Production Preflight`
 - `./scripts/prod_preflight.sh` with secure-mode CI environment
 
+6. `Release Dry Run`
+- `./scripts/release_dry_run.sh`
+
 ## Local Equivalent
 
 Run:

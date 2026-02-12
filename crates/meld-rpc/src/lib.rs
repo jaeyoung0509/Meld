@@ -16,9 +16,9 @@ pub fn build_hello_response(state: &AppState, request: HelloRequest) -> MeldResu
 }
 
 pub fn grpc_contract_docs_markdown() -> &'static str {
-    include_str!("../../../docs/generated/grpc-contracts.md")
+    include_str!("../generated/grpc-contracts.md")
 }
 
 pub fn grpc_contract_openapi_bridge_json() -> &'static str {
-    include_str!("../../../docs/generated/grpc-openapi-bridge.json")
+    include_str!("../generated/grpc-openapi-bridge.json")
 }

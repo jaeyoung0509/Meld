@@ -11,6 +11,8 @@ resolver = "2"
 edition = "2021"
 license = "MIT"
 version = "0.1.0"
+repository = "https://github.com/jaeyoung0509/Meld"
+homepage = "https://github.com/jaeyoung0509/Meld"
 
 [workspace.dependencies]
 axum = { version = "0.7", features = ["macros", "http2", "ws"] }

@@ -3,11 +3,18 @@ name = "meld-server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Single-port REST + gRPC server framework with FastAPI-like DX for Rust."
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/meld-server"
+readme = "README.md"
+keywords = ["meld", "axum", "tonic", "rest", "grpc"]
+categories = ["web-programming", "network-programming", "asynchronous"]
 
 [dependencies]
-meld-core = { path = "../meld-core" }
-meld-macros = { path = "../meld-macros" }
-meld-rpc = { path = "../meld-rpc" }
+meld-core = { path = "../meld-core", version = "0.1.0" }
+meld-macros = { path = "../meld-macros", version = "0.1.0" }
+meld-rpc = { path = "../meld-rpc", version = "0.1.0" }
 axum.workspace = true
 futures-util.workspace = true
 tokio.workspace = true

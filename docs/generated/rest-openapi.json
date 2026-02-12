@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "meld-server",
-    "description": "Related docs: /docs (REST Swagger UI), /grpc/contracts (rendered gRPC contracts), /grpc/contracts/openapi.json (gRPC OpenAPI bridge).",
+    "description": "Single-port REST + gRPC server framework with FastAPI-like DX for Rust.\n\nRelated docs: /docs (REST Swagger UI), /grpc/contracts (rendered gRPC contracts), /grpc/contracts/openapi.json (gRPC OpenAPI bridge).",
     "license": {
       "name": "MIT",
       "identifier": "MIT"

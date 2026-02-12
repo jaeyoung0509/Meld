@@ -115,3 +115,19 @@ jobs:
           MELD_REQUEST_BODY_LIMIT_BYTES: "1048576"
           MELD_MAX_IN_FLIGHT_REQUESTS: "1024"
         run: ./scripts/prod_preflight.sh
+
+  release-dry-run:
+    name: Release Dry Run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Validate publish dry-run for release crates
+        run: ./scripts/release_dry_run.sh

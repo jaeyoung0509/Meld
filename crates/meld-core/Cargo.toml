@@ -3,6 +3,13 @@ name = "meld-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Core domain types, state, and error model for the Meld framework."
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/meld-core"
+readme = "README.md"
+keywords = ["meld", "framework", "rest", "grpc", "rust"]
+categories = ["web-programming", "network-programming", "asynchronous"]
 
 [dependencies]
 jsonwebtoken.workspace = true
