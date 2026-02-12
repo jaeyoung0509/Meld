@@ -28,6 +28,7 @@ cargo test -p meld-server openapi_json_is_available -- --nocapture
 echo "[8/9] scripts/prod_preflight.sh"
 MELD_PREFLIGHT_SECURE=true \
 MELD_PREFLIGHT_BOOT_SERVER=true \
+MELD_PREFLIGHT_WAIT_SECONDS=120 \
 MELD_PREFLIGHT_BASE_URL=http://127.0.0.1:3000 \
 MELD_AUTH_ENABLED=true \
 MELD_AUTH_JWT_SECRET=local-dev-secret \

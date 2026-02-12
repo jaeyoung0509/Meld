@@ -7,7 +7,7 @@ cd "$ROOT_DIR"
 MELD_PREFLIGHT_BASE_URL="${MELD_PREFLIGHT_BASE_URL:-http://127.0.0.1:3000}"
 MELD_PREFLIGHT_BOOT_SERVER="${MELD_PREFLIGHT_BOOT_SERVER:-false}"
 MELD_PREFLIGHT_SECURE="${MELD_PREFLIGHT_SECURE:-false}"
-MELD_PREFLIGHT_WAIT_SECONDS="${MELD_PREFLIGHT_WAIT_SECONDS:-20}"
+MELD_PREFLIGHT_WAIT_SECONDS="${MELD_PREFLIGHT_WAIT_SECONDS:-120}"
 
 FAIL_COUNT=0
 WARN_COUNT=0
@@ -57,6 +57,9 @@ wait_for_server() {
   for i in $(seq 1 "$attempts"); do
     if curl -fsS "$base_url/health" >/dev/null 2>&1; then
       return 0
+    fi
+    if [[ -n "$SERVER_PID" ]] && ! kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+      return 1
     fi
     sleep 0.25
   done
