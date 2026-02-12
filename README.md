@@ -252,6 +252,8 @@ Validate publishability of release crates:
 The script performs `cargo publish --dry-run` for all release crates with temporary
 local `patch.crates-io` overrides to validate publish order before first index propagation.
 
+Automated release publishing is available via `.github/workflows/release.yml` and runs on `v*` tag pushes from `main`.
+
 ## Current Status
 
 Core roadmap items are implemented:
