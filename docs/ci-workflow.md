@@ -16,6 +16,9 @@ This project uses focused CI jobs so failures are clearly scoped:
 4. `Security Audit`
 - `cargo audit`
 
+5. `Production Preflight`
+- `./scripts/prod_preflight.sh` with secure-mode CI environment
+
 ## Local Equivalent
 
 Run:
