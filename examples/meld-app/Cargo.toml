@@ -3,6 +3,7 @@ name = "meld-app"
 edition.workspace = true
 license.workspace = true
 version.workspace = true
+publish = false
 
 [dependencies]
 meld = { package = "meld-server", path = "../../crates/meld-server" }

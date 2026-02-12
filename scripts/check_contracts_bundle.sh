@@ -10,6 +10,8 @@ git diff --exit-code -- \
   docs/generated/rest-openapi.json \
   docs/generated/grpc-contracts.md \
   docs/generated/grpc-openapi-bridge.json \
-  docs/generated/contracts-bundle.json
+  docs/generated/contracts-bundle.json \
+  crates/meld-rpc/generated/grpc-contracts.md \
+  crates/meld-rpc/generated/grpc-openapi-bridge.json
 
 echo "Contracts bundle artifacts are up to date."

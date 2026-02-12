@@ -236,6 +236,22 @@ MELD_CORS_ALLOW_ORIGINS=https://app.example.com \
 ./scripts/prod_preflight.sh
 ```
 
+## Release Readiness
+
+- `CHANGELOG.md`
+- `docs/release/versioning.md`
+- `docs/release/publish-runbook.md`
+- `.github/release-template.md`
+
+Validate publishability of release crates:
+
+```bash
+./scripts/release_dry_run.sh
+```
+
+The script performs `cargo publish --dry-run` for all release crates with temporary
+local `patch.crates-io` overrides to validate publish order before first index propagation.
+
 ## Current Status
 
 Core roadmap items are implemented:

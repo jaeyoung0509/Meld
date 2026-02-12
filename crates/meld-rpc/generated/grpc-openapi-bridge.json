@@ -1,0 +1,67 @@
+{
+  "components": {
+    "schemas": {
+      "meld.v1.HelloRequest": {
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "x-meld-message": "meld.v1.HelloRequest"
+      },
+      "meld.v1.HelloResponse": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "x-meld-message": "meld.v1.HelloResponse"
+      }
+    }
+  },
+  "info": {
+    "description": "Swagger-compatible contract view generated from protobuf descriptors.",
+    "title": "Meld gRPC Contract Bridge",
+    "version": "0.1.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/meld.v1.Greeter/SayHello": {
+      "post": {
+        "description": "Swagger-compatible bridge for gRPC method contract discovery.",
+        "requestBody": {
+          "content": {
+            "application/grpc+proto": {
+              "schema": {
+                "$ref": "#/components/schemas/meld.v1.HelloRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/grpc+proto": {
+                "schema": {
+                  "$ref": "#/components/schemas/meld.v1.HelloResponse"
+                }
+              }
+            },
+            "description": "gRPC success response payload shape"
+          }
+        },
+        "summary": "Greeter.SayHello",
+        "x-meld-grpc": {
+          "client_streaming": false,
+          "method": "SayHello",
+          "package": "meld.v1",
+          "server_streaming": false,
+          "service": "Greeter"
+        }
+      }
+    }
+  }
+}
