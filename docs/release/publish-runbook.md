@@ -51,6 +51,34 @@ cargo publish -p meld-rpc
 cargo publish -p meld-server
 ```
 
+## Automated GitHub Release Path (Recommended)
+
+This repository includes tag-driven automation in `.github/workflows/release.yml`.
+
+Prerequisites:
+- GitHub Actions secret: `CRATES_IO_TOKEN`
+- `release` environment configured with required reviewer(s)
+- protected `main` branch
+
+Execution:
+
+1. Merge `develop` into `main` through a PR.
+2. Tag from `main` and push:
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+3. GitHub Actions will:
+- re-run release quality gates
+- publish crates in dependency order (`meld-core` -> `meld-macros` -> `meld-rpc` -> `meld-server`)
+- create/update GitHub release notes
+
+The workflow rejects tags that are not reachable from `main`.
+
 ## First Release Candidate Tag Procedure
 
 1. Ensure `develop` is green on CI and release checklist is complete.

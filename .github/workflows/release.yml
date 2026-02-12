@@ -1,0 +1,120 @@
+name: Meld Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish Crates And Create Release
+    runs-on: ubuntu-latest
+    environment: release
+    concurrency:
+      group: release-${{ github.ref_name }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Ensure tag commit is reachable from main
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Tag $GITHUB_REF_NAME does not point to a commit on main."
+            exit 1
+          fi
+
+      - name: Validate release gates
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace
+          ./scripts/check_contracts_bundle.sh
+          MELD_PREFLIGHT_SECURE=true \
+          MELD_PREFLIGHT_BOOT_SERVER=true \
+          MELD_PREFLIGHT_WAIT_SECONDS=120 \
+          MELD_PREFLIGHT_BASE_URL=http://127.0.0.1:3000 \
+          MELD_AUTH_ENABLED=true \
+          MELD_AUTH_JWT_SECRET=ci-release-secret \
+          MELD_AUTH_ISSUER=https://issuer.local \
+          MELD_AUTH_AUDIENCE=meld-api \
+          MELD_CORS_ALLOW_ORIGINS=https://app.example.com \
+          MELD_TIMEOUT_SECONDS=15 \
+          MELD_REQUEST_BODY_LIMIT_BYTES=1048576 \
+          MELD_MAX_IN_FLIGHT_REQUESTS=1024 \
+          ./scripts/prod_preflight.sh
+          ./scripts/release_dry_run.sh
+
+      - name: Publish crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${CARGO_REGISTRY_TOKEN:-}" ]]; then
+            echo "CRATES_IO_TOKEN secret is required."
+            exit 1
+          fi
+
+          publish_with_retry() {
+            local crate="$1"
+            local attempt=1
+            local max_attempts=12
+
+            while (( attempt <= max_attempts )); do
+              local log_file
+              log_file="$(mktemp)"
+              echo "Publishing ${crate} (attempt ${attempt}/${max_attempts})"
+
+              if cargo publish -p "${crate}" --locked 2>&1 | tee "${log_file}"; then
+                rm -f "${log_file}"
+                return 0
+              fi
+
+              if grep -Eqi "already uploaded|already exists|previously published|crate version.*already exists" "${log_file}"; then
+                echo "${crate} is already published for this version; continuing."
+                rm -f "${log_file}"
+                return 0
+              fi
+
+              if grep -Eqi "no matching package named|failed to select a version for the requirement" "${log_file}"; then
+                if (( attempt < max_attempts )); then
+                  echo "Index propagation delay for ${crate}; retrying in 10s."
+                  rm -f "${log_file}"
+                  attempt=$((attempt + 1))
+                  sleep 10
+                  continue
+                fi
+              fi
+
+              echo "Failed to publish ${crate}."
+              rm -f "${log_file}"
+              return 1
+            done
+          }
+
+          publish_with_retry meld-core
+          publish_with_retry meld-macros
+          publish_with_retry meld-rpc
+          publish_with_retry meld-server
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-rc.') }}
