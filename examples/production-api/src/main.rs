@@ -464,7 +464,7 @@ mod tests {
     fn config_uses_defaults_when_optional_values_absent() {
         let cfg = ProductionConfig::from_lookup(|key| {
             if key == "PROD_API_DATABASE_URL" {
-                Some("postgres://postgres:postgres@127.0.0.1:55432/meld".to_string())
+                Some("postgres://127.0.0.1:55432/meld".to_string())
             } else {
                 None
             }
@@ -482,7 +482,7 @@ mod tests {
     async fn readyz_returns_503_when_database_is_unavailable() {
         let pool = PgPoolOptions::new()
             .max_connections(1)
-            .connect_lazy("postgres://postgres:postgres@127.0.0.1:1/meld")
+            .connect_lazy("postgres://127.0.0.1:1/meld")
             .expect("lazy pool should build");
 
         let state = Arc::new(ProductionApiState::new(

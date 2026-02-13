@@ -6,7 +6,7 @@ This runbook covers local boot, migration behavior, smoke tests, and dependency 
 
 Required:
 
-- `PROD_API_DATABASE_URL` (for example `postgres://postgres:postgres@127.0.0.1:55432/meld`)
+- `PROD_API_DATABASE_URL` (build from local DB env vars)
 
 Optional (defaults shown):
 
@@ -19,7 +19,7 @@ Optional (defaults shown):
 Auth-related (recommended for realistic production flow):
 
 - `MELD_AUTH_ENABLED=true`
-- `MELD_AUTH_JWT_SECRET=<secret>`
+- `MELD_AUTH_JWT_SECRET=<local-only-secret>`
 - `MELD_AUTH_ISSUER=<issuer>`
 - `MELD_AUTH_AUDIENCE=<audience>`
 
@@ -28,17 +28,20 @@ Auth-related (recommended for realistic production flow):
 1. Start PostgreSQL:
 
 ```bash
-docker compose -f examples/production-api/docker-compose.yml up -d
+cp examples/production-api/.env.example examples/production-api/.env.local
+# edit examples/production-api/.env.local and set local-only values
+docker compose --env-file examples/production-api/.env.local \
+  -f examples/production-api/docker-compose.yml up -d
 ```
 
 2. Export env vars and start API:
 
 ```bash
-export PROD_API_DATABASE_URL='postgres://postgres:postgres@127.0.0.1:55432/meld'
-export MELD_AUTH_ENABLED='true'
-export MELD_AUTH_JWT_SECRET='dev-secret'
-export MELD_AUTH_ISSUER='https://issuer.local'
-export MELD_AUTH_AUDIENCE='meld-api'
+set -a
+source examples/production-api/.env.local
+set +a
+
+export PROD_API_DATABASE_URL=\"postgres://${PROD_API_DB_USER}:${PROD_API_DB_PASSWORD}@127.0.0.1:55432/${PROD_API_DB_NAME}\"
 
 cargo run -p production-api
 ```
@@ -73,9 +76,9 @@ gRPC:
 
 ```bash
 TOKEN=$(python3 scripts/generate_dev_jwt.py \
-  --secret dev-secret \
-  --issuer https://issuer.local \
-  --audience meld-api)
+  --secret "${MELD_AUTH_JWT_SECRET}" \
+  --issuer "${MELD_AUTH_ISSUER}" \
+  --audience "${MELD_AUTH_AUDIENCE}")
 
 grpcurl -plaintext \
   -H "authorization: Bearer ${TOKEN}" \
@@ -93,7 +96,8 @@ Scenario: PostgreSQL outage.
 1. Simulate outage:
 
 ```bash
-docker compose -f examples/production-api/docker-compose.yml stop postgres
+docker compose --env-file examples/production-api/.env.local \
+  -f examples/production-api/docker-compose.yml stop postgres
 ```
 
 2. Observe readiness failure (`503`):
@@ -105,7 +109,8 @@ curl -i http://127.0.0.1:4100/readyz
 3. Recover DB:
 
 ```bash
-docker compose -f examples/production-api/docker-compose.yml start postgres
+docker compose --env-file examples/production-api/.env.local \
+  -f examples/production-api/docker-compose.yml start postgres
 ```
 
 4. Confirm readiness returns `200`.
@@ -118,5 +123,6 @@ If readiness does not recover:
 ## Shutdown
 
 ```bash
-docker compose -f examples/production-api/docker-compose.yml down -v
+docker compose --env-file examples/production-api/.env.local \
+  -f examples/production-api/docker-compose.yml down -v
 ```

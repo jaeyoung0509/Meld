@@ -20,22 +20,23 @@ This example demonstrates:
 From repository root:
 
 ```bash
-docker compose -f examples/production-api/docker-compose.yml up -d
+cp examples/production-api/.env.example examples/production-api/.env.local
+# edit examples/production-api/.env.local and set local-only values
+docker compose --env-file examples/production-api/.env.local \
+  -f examples/production-api/docker-compose.yml up -d
 ```
 
 ## 2) Run server
 
 ```bash
-export PROD_API_DATABASE_URL='postgres://postgres:postgres@127.0.0.1:55432/meld'
+set -a
+source examples/production-api/.env.local
+set +a
+
+export PROD_API_DATABASE_URL=\"postgres://${PROD_API_DB_USER}:${PROD_API_DB_PASSWORD}@127.0.0.1:55432/${PROD_API_DB_NAME}\"
 export PROD_API_ADDR='127.0.0.1:4100'
 export PROD_API_SERVICE_NAME='production-api'
 export PROD_API_RUN_MIGRATIONS='true'
-
-# auth enabled for protected REST + gRPC
-export MELD_AUTH_ENABLED='true'
-export MELD_AUTH_JWT_SECRET='dev-secret'
-export MELD_AUTH_ISSUER='https://issuer.local'
-export MELD_AUTH_AUDIENCE='meld-api'
 
 cargo run -p production-api
 ```
@@ -70,9 +71,9 @@ Create dev token:
 
 ```bash
 TOKEN=$(python3 scripts/generate_dev_jwt.py \
-  --secret dev-secret \
-  --issuer https://issuer.local \
-  --audience meld-api)
+  --secret "${MELD_AUTH_JWT_SECRET}" \
+  --issuer "${MELD_AUTH_ISSUER}" \
+  --audience "${MELD_AUTH_AUDIENCE}")
 ```
 
 Call with token (expected `200` when note exists):
@@ -112,7 +113,8 @@ grpcurl -plaintext \
 1. Stop PostgreSQL:
 
 ```bash
-docker compose -f examples/production-api/docker-compose.yml stop postgres
+docker compose --env-file examples/production-api/.env.local \
+  -f examples/production-api/docker-compose.yml stop postgres
 ```
 
 2. Readiness should fail (`503`):
@@ -124,7 +126,8 @@ curl -i http://127.0.0.1:4100/readyz
 3. Start PostgreSQL again:
 
 ```bash
-docker compose -f examples/production-api/docker-compose.yml start postgres
+docker compose --env-file examples/production-api/.env.local \
+  -f examples/production-api/docker-compose.yml start postgres
 ```
 
 4. Readiness should recover (`200`):
@@ -150,5 +153,6 @@ curl -i http://127.0.0.1:4100/readyz
 ## Shutdown / Cleanup
 
 ```bash
-docker compose -f examples/production-api/docker-compose.yml down -v
+docker compose --env-file examples/production-api/.env.local \
+  -f examples/production-api/docker-compose.yml down -v
 ```
