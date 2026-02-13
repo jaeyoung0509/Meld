@@ -41,7 +41,8 @@ set -a
 source examples/production-api/.env.local
 set +a
 
-export PROD_API_DATABASE_URL=\"postgres://${PROD_API_DB_USER}:${PROD_API_DB_PASSWORD}@127.0.0.1:55432/${PROD_API_DB_NAME}\"
+export PROD_API_DATABASE_URL="postgres://${PROD_API_DB_USER}:${PROD_API_DB_PASSWORD}@127.0.0.1:55432/${PROD_API_DB_NAME}"
+export MELD_AUTH_ENABLED='true'
 
 cargo run -p production-api
 ```
@@ -65,21 +66,28 @@ curl -i http://127.0.0.1:4100/readyz
 REST:
 
 ```bash
-curl -s -X POST http://127.0.0.1:4100/v1/notes \
-  -H 'content-type: application/json' \
-  -d '{"title":"hello","body":"world"}'
-
-curl -s 'http://127.0.0.1:4100/v1/notes?limit=5'
-```
-
-gRPC:
-
-```bash
 TOKEN=$(python3 scripts/generate_dev_jwt.py \
   --secret "${MELD_AUTH_JWT_SECRET}" \
   --issuer "${MELD_AUTH_ISSUER}" \
   --audience "${MELD_AUTH_AUDIENCE}")
 
+curl -i http://127.0.0.1:4100/v1/notes
+
+curl -s -X POST http://127.0.0.1:4100/v1/notes \
+  -H "authorization: Bearer ${TOKEN}" \
+  -H 'content-type: application/json' \
+  -d '{"title":"hello","body":"world"}'
+
+curl -s 'http://127.0.0.1:4100/v1/notes?limit=5' \
+  -H "authorization: Bearer ${TOKEN}"
+
+curl -s http://127.0.0.1:4100/protected/notes/1 \
+  -H "authorization: Bearer ${TOKEN}"
+```
+
+gRPC:
+
+```bash
 grpcurl -plaintext \
   -H "authorization: Bearer ${TOKEN}" \
   -import-path crates/meld-rpc/proto \

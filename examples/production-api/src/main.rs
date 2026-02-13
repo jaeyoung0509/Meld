@@ -7,6 +7,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use chrono::{DateTime, Utc};
 use meld_core::{auth::AuthPrincipal, AppState};
 use meld_server::{
     api::{ApiError, ApiErrorResponse},
@@ -164,7 +165,7 @@ struct NoteResponse {
     id: i64,
     title: String,
     body: Option<String>,
-    created_at: String,
+    created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize)]
@@ -178,7 +179,7 @@ struct NoteRow {
     id: i64,
     title: String,
     body: Option<String>,
-    created_at: String,
+    created_at: DateTime<Utc>,
 }
 
 #[meld_server::dto]
@@ -231,20 +232,22 @@ async fn readyz(
 
 #[meld_server::route(post, "/v1/notes", auto_validate)]
 async fn create_note(
+    Extension(principal): Extension<AuthPrincipal>,
     State(state): State<Arc<ProductionApiState>>,
     Json(body): Json<CreateNoteBody>,
 ) -> Result<(StatusCode, Json<NoteResponse>), ApiError> {
     let note = sqlx::query_as::<_, NoteRow>(
         r#"
-        INSERT INTO notes (title, body)
-        VALUES ($1, $2)
+        INSERT INTO notes (owner_subject, title, body)
+        VALUES ($1, $2, $3)
         RETURNING
             id,
             title,
             body,
-            to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+            created_at
         "#,
     )
+    .bind(principal.subject)
     .bind(body.title)
     .bind(body.body)
     .fetch_one(&state.pool)
@@ -256,6 +259,7 @@ async fn create_note(
 
 #[meld_server::route(get, "/v1/notes", auto_validate)]
 async fn list_notes(
+    Extension(principal): Extension<AuthPrincipal>,
     State(state): State<Arc<ProductionApiState>>,
     axum::extract::Query(query): axum::extract::Query<ListNotesQuery>,
 ) -> Result<Json<Vec<NoteResponse>>, ApiError> {
@@ -267,12 +271,14 @@ async fn list_notes(
             id,
             title,
             body,
-            to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+            created_at
         FROM notes
+        WHERE owner_subject = $1
         ORDER BY id DESC
-        LIMIT $1
+        LIMIT $2
         "#,
     )
+    .bind(principal.subject)
     .bind(limit)
     .fetch_all(&state.pool)
     .await
@@ -292,18 +298,20 @@ async fn get_protected_note(
     State(state): State<Arc<ProductionApiState>>,
     axum::extract::Path(path): axum::extract::Path<NotePath>,
 ) -> Result<Json<ProtectedNoteResponse>, ApiError> {
+    let subject = principal.subject;
     let maybe_note = sqlx::query_as::<_, NoteRow>(
         r#"
         SELECT
             id,
             title,
             body,
-            to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+            created_at
         FROM notes
-        WHERE id = $1
+        WHERE id = $1 AND owner_subject = $2
         "#,
     )
     .bind(path.id)
+    .bind(&subject)
     .fetch_optional(&state.pool)
     .await
     .map_err(database_error)?;
@@ -312,7 +320,7 @@ async fn get_protected_note(
 
     Ok(Json(ProtectedNoteResponse {
         note: note.into_response(),
-        subject: principal.subject,
+        subject,
     }))
 }
 
@@ -361,7 +369,8 @@ fn database_error(err: sqlx::Error) -> ApiError {
 }
 
 fn build_rest_router(state: Arc<ProductionApiState>, auth_cfg: AuthRuntimeConfig) -> Router {
-    let protected_router = Router::new()
+    let notes_router = Router::new()
+        .route("/v1/notes", get(list_notes).post(create_note))
         .route("/protected/notes/:id", get(get_protected_note))
         .route_layer(from_fn_with_state(auth_cfg, auth::rest_auth_middleware));
 
@@ -369,8 +378,7 @@ fn build_rest_router(state: Arc<ProductionApiState>, auth_cfg: AuthRuntimeConfig
         .route("/livez", get(livez))
         .route("/health", get(health))
         .route("/readyz", get(readyz))
-        .route("/v1/notes", get(list_notes).post(create_note))
-        .merge(protected_router)
+        .merge(notes_router)
         .with_state(state)
 }
 
@@ -443,7 +451,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{body::Body, http::Request};
+    use axum::{body::to_bytes, body::Body, http::Request};
     use tower::util::ServiceExt;
 
     #[test]
@@ -502,5 +510,45 @@ mod tests {
             .expect("request should complete");
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn notes_routes_require_auth_when_enabled() {
+        let pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy("postgres://127.0.0.1:1/meld")
+            .expect("lazy pool should build");
+
+        let state = Arc::new(ProductionApiState::new(
+            "test-production-api".to_string(),
+            pool,
+        ));
+        let app = build_rest_router(
+            state,
+            AuthRuntimeConfig {
+                enabled: true,
+                jwt_secret: Some("dev-secret".to_string()),
+                expected_issuer: Some("https://issuer.local".to_string()),
+                expected_audience: Some("meld-api".to_string()),
+            },
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/notes")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("request should complete");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body bytes");
+        let parsed: ApiErrorResponse =
+            serde_json::from_slice(&body).expect("error body should parse");
+        assert_eq!(parsed.code, "unauthorized");
     }
 }

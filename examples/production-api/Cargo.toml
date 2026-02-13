@@ -16,7 +16,8 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 validator.workspace = true
 utoipa.workspace = true
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "macros", "migrate"] }
+chrono = { version = "0.4", features = ["serde"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "macros", "migrate", "chrono"] }
 # Keep CI/local toolchain (Rust 1.86) compatible with sqlx transitive requirements.
 home = "=0.5.11"
 
