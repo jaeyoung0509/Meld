@@ -3,6 +3,7 @@ members = [
   "crates/meld-core", "crates/meld-macros",
   "crates/meld-rpc",
   "crates/meld-server", "examples/meld-app",
+  "examples/production-api",
   "examples/simple-server",
 ]
 resolver = "2"

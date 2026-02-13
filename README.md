@@ -149,6 +149,7 @@ crates/meld-core     # domain, state, error model
 crates/meld-rpc      # proto, tonic codegen, grpc-docgen tool
 crates/meld-server   # REST + gRPC routing, middleware, builder API
 contracts/           # explicit REST <-> gRPC mapping definitions
+examples/production-api
 examples/simple-server
 examples/meld-app
 docs/
@@ -175,6 +176,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 See:
 - `docs/fastapi-like-builder.md`
 - `docs/dx-scorecard.md`
+- `examples/production-api/README.md`
+- `examples/production-api/src/main.rs`
 - `examples/simple-server/README.md`
 - `examples/simple-server/src/main.rs`
 - `examples/meld-app/src/main.rs` (dependency-rename-safe macro usage)
@@ -222,6 +225,7 @@ This runs:
 - `docs/production/security.md`
 - `docs/production/observability.md`
 - `docs/production/runbook.md`
+- `docs/production/production-api-runbook.md`
 
 Run production preflight locally:
 
