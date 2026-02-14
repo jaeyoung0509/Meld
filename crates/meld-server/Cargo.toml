@@ -37,3 +37,4 @@ pulldown-cmark.workspace = true
 jsonwebtoken.workspace = true
 reqwest.workspace = true
 tokio-tungstenite.workspace = true
+proptest.workspace = true
