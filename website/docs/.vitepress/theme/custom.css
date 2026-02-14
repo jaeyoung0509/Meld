@@ -1,0 +1,14 @@
+:root {
+  --vp-c-brand-1: #23b2de;
+  --vp-c-brand-2: #1a9bc3;
+  --vp-c-brand-3: #137f9f;
+  --vp-c-brand-soft: rgba(35, 178, 222, 0.15);
+}
+
+.VPHomeHero .image {
+  filter: drop-shadow(0 12px 28px rgba(15, 36, 52, 0.28));
+}
+
+.VPFeature {
+  border-radius: 16px;
+}
