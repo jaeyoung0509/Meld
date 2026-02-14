@@ -40,11 +40,13 @@ proptest! {
 
     #[test]
     fn internal_error_mapping_is_sanitized(message in "(?s).{1,64}") {
+        prop_assume!(message != "internal server error");
+
         let (status, Json(rest)) = map_domain_error_to_rest(MeldError::Internal(message.clone()));
         prop_assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
         prop_assert_eq!(rest.code, "internal_error");
         prop_assert_eq!(rest.message.as_str(), "internal server error");
-        prop_assert!(!rest.message.contains(&message));
+        prop_assert_ne!(rest.message.as_str(), message.as_str());
 
         let grpc = map_domain_error_to_grpc(MeldError::Internal(message));
         prop_assert_eq!(grpc.code(), tonic::Code::Internal);

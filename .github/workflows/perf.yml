@@ -1,0 +1,88 @@
+name: Perf Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      rest_p95_ms:
+        description: "REST p95 latency threshold (ms)"
+        required: true
+        default: "120"
+      rest_error_rate:
+        description: "REST error-rate threshold"
+        required: true
+        default: "0.01"
+      grpc_p95_ms:
+        description: "gRPC p95 latency threshold (ms)"
+        required: true
+        default: "120"
+      grpc_error_rate:
+        description: "gRPC error-rate threshold"
+        required: true
+        default: "0.01"
+      rest_vus:
+        description: "REST k6 virtual users"
+        required: true
+        default: "20"
+      rest_duration:
+        description: "REST k6 duration"
+        required: true
+        default: "12s"
+      grpc_requests:
+        description: "gRPC ghz total requests"
+        required: true
+        default: "500"
+      grpc_concurrency:
+        description: "gRPC ghz concurrency"
+        required: true
+        default: "25"
+
+jobs:
+  perf-gate:
+    name: Perf Regression Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install ghz
+        run: |
+          go install github.com/bojand/ghz/cmd/ghz@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Run perf gate
+        env:
+          MELD_PERF_BOOT_SERVER: "true"
+          MELD_PERF_WAIT_SECONDS: "120"
+          MELD_PERF_BASE_URL: "http://127.0.0.1:3000"
+          MELD_PERF_GRPC_ADDR: "127.0.0.1:3000"
+          MELD_PERF_REST_PATH: "/health"
+          MELD_PERF_REST_VUS: ${{ inputs.rest_vus }}
+          MELD_PERF_REST_DURATION: ${{ inputs.rest_duration }}
+          MELD_PERF_REST_P95_MS: ${{ inputs.rest_p95_ms }}
+          MELD_PERF_REST_ERR_RATE: ${{ inputs.rest_error_rate }}
+          MELD_PERF_GRPC_REQUESTS: ${{ inputs.grpc_requests }}
+          MELD_PERF_GRPC_CONCURRENCY: ${{ inputs.grpc_concurrency }}
+          MELD_PERF_GRPC_P95_MS: ${{ inputs.grpc_p95_ms }}
+          MELD_PERF_GRPC_ERR_RATE: ${{ inputs.grpc_error_rate }}
+        run: ./scripts/perf_gate.sh
+
+      - name: Upload perf artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-report
+          path: target/perf
