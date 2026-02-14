@@ -306,9 +306,15 @@ Openportio includes shared JWT claim validation used by both REST and gRPC layer
 
 Environment configuration:
 - `OPENPORTIO_AUTH_ENABLED=true`
-- `OPENPORTIO_AUTH_JWT_SECRET=<hmac-secret>`
+- choose one validation mode:
+  - shared-secret mode: `OPENPORTIO_AUTH_JWT_SECRET=<hmac-secret>`
+  - JWKS mode: `OPENPORTIO_AUTH_JWKS_URL=<https://issuer/.well-known/jwks.json>`
+- optional JWKS tuning:
+  - `OPENPORTIO_AUTH_JWKS_REFRESH_SECS=300`
+  - `OPENPORTIO_AUTH_JWKS_ALGORITHMS=RS256,ES256`
 - optional: `OPENPORTIO_AUTH_ISSUER=<issuer>`
 - optional: `OPENPORTIO_AUTH_AUDIENCE=<audience>`
+- if both secret and JWKS are set, runtime prefers JWKS mode.
 
 When enabled:
 - REST protected route example: `GET /protected/whoami` (Bearer token required)
@@ -458,3 +464,6 @@ Common auth mismatch outcomes:
 - wrong `--secret` / `OPENPORTIO_AUTH_JWT_SECRET`: `UNAUTHENTICATED`
 - wrong `--issuer` / `OPENPORTIO_AUTH_ISSUER`: `UNAUTHENTICATED`
 - wrong `--audience` / `OPENPORTIO_AUTH_AUDIENCE`: `UNAUTHENTICATED`
+- unknown `kid` (JWKS mode): `UNAUTHENTICATED`
+- unreachable `OPENPORTIO_AUTH_JWKS_URL`: `INTERNAL`
+- malformed JWKS payload: `INTERNAL`

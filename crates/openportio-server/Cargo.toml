@@ -32,9 +32,10 @@ serde_json.workspace = true
 http.workspace = true
 validator.workspace = true
 pulldown-cmark.workspace = true
+jsonwebtoken.workspace = true
+ureq = { version = "2.10" }
 
 [dev-dependencies]
-jsonwebtoken.workspace = true
 reqwest.workspace = true
 tokio-tungstenite.workspace = true
 proptest.workspace = true

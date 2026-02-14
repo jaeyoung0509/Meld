@@ -760,15 +760,9 @@ mod tests {
 
     #[tokio::test]
     async fn protected_route_returns_anonymous_when_auth_disabled() {
-        let app = build_router_with_auth(
-            Arc::new(AppState::local("test-server")),
-            auth::AuthRuntimeConfig {
-                enabled: false,
-                jwt_secret: None,
-                expected_issuer: None,
-                expected_audience: None,
-            },
-        );
+        let mut auth_cfg = auth::AuthRuntimeConfig::default();
+        auth_cfg.enabled = false;
+        let app = build_router_with_auth(Arc::new(AppState::local("test-server")), auth_cfg);
 
         let response = app
             .oneshot(
@@ -790,15 +784,12 @@ mod tests {
 
     #[tokio::test]
     async fn protected_route_rejects_missing_token_when_auth_enabled() {
-        let app = build_router_with_auth(
-            Arc::new(AppState::local("test-server")),
-            auth::AuthRuntimeConfig {
-                enabled: true,
-                jwt_secret: Some("dev-secret".to_string()),
-                expected_issuer: Some("https://issuer.local".to_string()),
-                expected_audience: Some("openportio-api".to_string()),
-            },
-        );
+        let mut auth_cfg = auth::AuthRuntimeConfig::default();
+        auth_cfg.enabled = true;
+        auth_cfg.jwt_secret = Some("dev-secret".to_string());
+        auth_cfg.expected_issuer = Some("https://issuer.local".to_string());
+        auth_cfg.expected_audience = Some("openportio-api".to_string());
+        let app = build_router_with_auth(Arc::new(AppState::local("test-server")), auth_cfg);
 
         let response = app
             .oneshot(
@@ -816,15 +807,12 @@ mod tests {
     async fn protected_route_accepts_valid_token_when_auth_enabled() {
         let secret = "dev-secret";
         let token = issue_test_token(secret);
-        let app = build_router_with_auth(
-            Arc::new(AppState::local("test-server")),
-            auth::AuthRuntimeConfig {
-                enabled: true,
-                jwt_secret: Some(secret.to_string()),
-                expected_issuer: Some("https://issuer.local".to_string()),
-                expected_audience: Some("openportio-api".to_string()),
-            },
-        );
+        let mut auth_cfg = auth::AuthRuntimeConfig::default();
+        auth_cfg.enabled = true;
+        auth_cfg.jwt_secret = Some(secret.to_string());
+        auth_cfg.expected_issuer = Some("https://issuer.local".to_string());
+        auth_cfg.expected_audience = Some("openportio-api".to_string());
+        let app = build_router_with_auth(Arc::new(AppState::local("test-server")), auth_cfg);
 
         let response = app
             .oneshot(

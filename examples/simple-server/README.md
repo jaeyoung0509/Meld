@@ -48,6 +48,11 @@ OPENPORTIO_AUTH_AUDIENCE=openportio-api \
 cargo run -p simple-server
 ```
 
+Alternative auth mode:
+- instead of `OPENPORTIO_AUTH_JWT_SECRET`, you can use
+  `OPENPORTIO_AUTH_JWKS_URL=<issuer jwks endpoint>`
+- optional: `OPENPORTIO_AUTH_JWKS_REFRESH_SECS`, `OPENPORTIO_AUTH_JWKS_ALGORITHMS`
+
 Call without token (expected `UNAUTHENTICATED`):
 
 ```bash
@@ -88,5 +93,7 @@ grpcurl -plaintext \
   - Install Python 3 or generate token with another JWT tool.
 - `Code: Unauthenticated`
   - Verify `OPENPORTIO_AUTH_JWT_SECRET`, `OPENPORTIO_AUTH_ISSUER`, `OPENPORTIO_AUTH_AUDIENCE` match token inputs.
+- `Code: Internal` in JWKS mode
+  - Verify `OPENPORTIO_AUTH_JWKS_URL` is reachable and returns a valid JWKS document with expected `kid`.
 - `Failed to process proto source files` / import errors
   - Run commands from repository root so `crates/openportio-rpc/proto` and `service.proto` resolve correctly.

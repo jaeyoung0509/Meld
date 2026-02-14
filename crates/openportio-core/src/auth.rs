@@ -59,29 +59,42 @@ pub fn validate_bearer_jwt(
     token: &str,
     cfg: &JwtValidationConfig,
 ) -> Result<AuthPrincipal, AuthError> {
-    let mut validation = Validation::new(Algorithm::HS256);
+    let decoding_key = DecodingKey::from_secret(cfg.secret.as_bytes());
+    validate_bearer_jwt_with_key(
+        token,
+        &decoding_key,
+        Algorithm::HS256,
+        cfg.expected_issuer.as_deref(),
+        cfg.expected_audience.as_deref(),
+    )
+}
+
+pub fn validate_bearer_jwt_with_key(
+    token: &str,
+    decoding_key: &DecodingKey,
+    algorithm: Algorithm,
+    expected_issuer: Option<&str>,
+    expected_audience: Option<&str>,
+) -> Result<AuthPrincipal, AuthError> {
+    let mut validation = Validation::new(algorithm);
     validation.validate_exp = true;
     validation.validate_aud = false;
     validation
         .required_spec_claims
         .extend(["sub".to_string(), "exp".to_string()]);
 
-    let token_data = decode::<JwtClaims>(
-        token,
-        &DecodingKey::from_secret(cfg.secret.as_bytes()),
-        &validation,
-    )
-    .map_err(|err| AuthError::InvalidToken(err.to_string()))?;
+    let token_data = decode::<JwtClaims>(token, decoding_key, &validation)
+        .map_err(|err| AuthError::InvalidToken(err.to_string()))?;
 
     let claims = token_data.claims;
-    if let Some(expected) = cfg.expected_issuer.as_deref() {
+    if let Some(expected) = expected_issuer {
         if claims.iss.as_deref() != Some(expected) {
             return Err(AuthError::IssuerMismatch);
         }
     }
 
     let audience = claims.aud.map(AudienceClaim::into_vec).unwrap_or_default();
-    if let Some(expected) = cfg.expected_audience.as_deref() {
+    if let Some(expected) = expected_audience {
         if !audience.iter().any(|value| value == expected) {
             return Err(AuthError::AudienceMismatch);
         }

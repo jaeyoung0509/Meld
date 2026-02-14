@@ -523,15 +523,12 @@ mod tests {
             "test-production-api".to_string(),
             pool,
         ));
-        let app = build_rest_router(
-            state,
-            AuthRuntimeConfig {
-                enabled: true,
-                jwt_secret: Some("dev-secret".to_string()),
-                expected_issuer: Some("https://issuer.local".to_string()),
-                expected_audience: Some("openportio-api".to_string()),
-            },
-        );
+        let mut auth_cfg = AuthRuntimeConfig::default();
+        auth_cfg.enabled = true;
+        auth_cfg.jwt_secret = Some("dev-secret".to_string());
+        auth_cfg.expected_issuer = Some("https://issuer.local".to_string());
+        auth_cfg.expected_audience = Some("openportio-api".to_string());
+        let app = build_rest_router(state, auth_cfg);
 
         let response = app
             .oneshot(
