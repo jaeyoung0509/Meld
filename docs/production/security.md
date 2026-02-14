@@ -7,7 +7,12 @@ This page defines a practical secure baseline for deploying Openportio.
 Use JWT auth in production:
 
 - `OPENPORTIO_AUTH_ENABLED=true`
-- `OPENPORTIO_AUTH_JWT_SECRET` must be set
+- choose one verification mode:
+  - shared-secret mode: `OPENPORTIO_AUTH_JWT_SECRET`
+  - JWKS mode: `OPENPORTIO_AUTH_JWKS_URL`
+- optional JWKS tuning:
+  - `OPENPORTIO_AUTH_JWKS_REFRESH_SECS` (default `300`)
+  - `OPENPORTIO_AUTH_JWKS_ALGORITHMS` (default `RS256,RS384,RS512,ES256,ES384`)
 - `OPENPORTIO_AUTH_ISSUER` recommended
 - `OPENPORTIO_AUTH_AUDIENCE` recommended
 
@@ -30,7 +35,8 @@ Do not use wildcard CORS in production:
 ## Secret Management
 
 - Never commit JWT secrets to git
-- Rotate `OPENPORTIO_AUTH_JWT_SECRET` regularly
+- Rotate `OPENPORTIO_AUTH_JWT_SECRET` regularly when running shared-secret mode
+- In JWKS mode, rotate issuer keys and keep overlapping key windows so old and new `kid` values validate during rollout
 - Inject secrets via secret manager / runtime environment
 
 ## Preflight Security Check

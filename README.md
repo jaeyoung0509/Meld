@@ -75,7 +75,13 @@ Middleware defaults:
 
 Auth defaults:
 - disabled by default (`OPENPORTIO_AUTH_ENABLED=false`)
-- when enabled, JWT HMAC secret required (`OPENPORTIO_AUTH_JWT_SECRET`)
+- when enabled, choose one token validation mode:
+  - shared-secret mode: `OPENPORTIO_AUTH_JWT_SECRET`
+  - JWKS mode: `OPENPORTIO_AUTH_JWKS_URL`
+- optional JWKS tuning:
+  - `OPENPORTIO_AUTH_JWKS_REFRESH_SECS` (default: `300`)
+  - `OPENPORTIO_AUTH_JWKS_ALGORITHMS` (default: `RS256,RS384,RS512,ES256,ES384`)
+- when both secret and JWKS are configured, JWKS mode takes precedence.
 - optional issuer/audience checks:
   - `OPENPORTIO_AUTH_ISSUER`
   - `OPENPORTIO_AUTH_AUDIENCE`
@@ -141,6 +147,13 @@ grpcurl -plaintext \
   127.0.0.1:3000 \
   openportio.v1.Greeter/SayHello
 ```
+
+Auth troubleshooting quick map:
+- wrong `OPENPORTIO_AUTH_JWT_SECRET` (secret mode): `UNAUTHENTICATED`
+- wrong `OPENPORTIO_AUTH_ISSUER` or `OPENPORTIO_AUTH_AUDIENCE`: `UNAUTHENTICATED`
+- unknown `kid` (JWKS mode): `UNAUTHENTICATED`
+- unreachable `OPENPORTIO_AUTH_JWKS_URL`: `500 internal_error` (REST) / `INTERNAL` (gRPC)
+- malformed JWKS payload: `500 internal_error` (REST) / `INTERNAL` (gRPC)
 
 ### 5) Open docs
 

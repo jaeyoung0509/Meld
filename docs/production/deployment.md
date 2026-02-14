@@ -11,7 +11,12 @@ This guide describes minimum production deployment patterns for Openportio.
 ## Required Environment Variables (Secure Baseline)
 
 - `OPENPORTIO_AUTH_ENABLED=true`
-- `OPENPORTIO_AUTH_JWT_SECRET=<strong-random-secret>`
+- choose one auth mode:
+  - `OPENPORTIO_AUTH_JWT_SECRET=<strong-random-secret>` (shared-secret mode)
+  - `OPENPORTIO_AUTH_JWKS_URL=<https://issuer/.well-known/jwks.json>` (JWKS mode)
+- optional JWKS tuning:
+  - `OPENPORTIO_AUTH_JWKS_REFRESH_SECS=300`
+  - `OPENPORTIO_AUTH_JWKS_ALGORITHMS=RS256,ES256`
 - `OPENPORTIO_AUTH_ISSUER=<issuer-url>` (recommended)
 - `OPENPORTIO_AUTH_AUDIENCE=<audience>` (recommended)
 - `OPENPORTIO_CORS_ALLOW_ORIGINS=<comma-separated allowlist>`

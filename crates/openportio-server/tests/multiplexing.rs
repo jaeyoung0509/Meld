@@ -227,12 +227,11 @@ fn issue_test_token(secret: &str) -> String {
 #[tokio::test]
 async fn grpc_auth_interceptor_rejects_missing_token_and_accepts_valid_token() {
     let state = Arc::new(AppState::local("multiplexing-auth-test"));
-    let auth_cfg = AuthRuntimeConfig {
-        enabled: true,
-        jwt_secret: Some("dev-secret".to_string()),
-        expected_issuer: Some("https://issuer.local".to_string()),
-        expected_audience: Some("openportio-api".to_string()),
-    };
+    let mut auth_cfg = AuthRuntimeConfig::default();
+    auth_cfg.enabled = true;
+    auth_cfg.jwt_secret = Some("dev-secret".to_string());
+    auth_cfg.expected_issuer = Some("https://issuer.local".to_string());
+    auth_cfg.expected_audience = Some("openportio-api".to_string());
     let app = middleware::apply_shared_middleware(
         build_multiplexed_router_with_auth(state, auth_cfg),
         &middleware::MiddlewareConfig::default(),
