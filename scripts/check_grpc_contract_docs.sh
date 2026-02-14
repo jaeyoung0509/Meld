@@ -9,7 +9,7 @@ cd "$ROOT_DIR"
 git diff --exit-code -- \
   docs/generated/grpc-contracts.md \
   docs/generated/grpc-openapi-bridge.json \
-  crates/meld-rpc/generated/grpc-contracts.md \
-  crates/meld-rpc/generated/grpc-openapi-bridge.json
+  crates/openportio-rpc/generated/grpc-contracts.md \
+  crates/openportio-rpc/generated/grpc-openapi-bridge.json
 
 echo "gRPC contract docs are up to date."

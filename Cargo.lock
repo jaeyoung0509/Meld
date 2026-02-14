@@ -1363,83 +1363,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "meld-app"
-version = "0.1.0"
-dependencies = [
- "axum",
- "meld-server",
- "serde",
- "serde_json",
- "tokio",
- "tower 0.5.3",
- "utoipa",
- "validator",
-]
-
-[[package]]
-name = "meld-core"
-version = "0.1.0"
-dependencies = [
- "jsonwebtoken",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "meld-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "meld-rpc"
-version = "0.1.0"
-dependencies = [
- "meld-core",
- "prost",
- "prost-types",
- "protoc-bin-vendored",
- "serde_json",
- "tempfile",
- "tonic",
- "tonic-build",
-]
-
-[[package]]
-name = "meld-server"
-version = "0.1.0"
-dependencies = [
- "axum",
- "futures-util",
- "http",
- "jsonwebtoken",
- "meld-core",
- "meld-macros",
- "meld-rpc",
- "proptest",
- "pulldown-cmark",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite",
- "tonic",
- "tonic-reflection",
- "tower 0.5.3",
- "tower-http 0.5.2",
- "tracing",
- "tracing-subscriber",
- "utoipa",
- "utoipa-swagger-ui",
- "validator",
-]
-
-[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1548,6 +1471,83 @@ name = "once_cell"
 version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
+
+[[package]]
+name = "openportio-app"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "openportio-server",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower 0.5.3",
+ "utoipa",
+ "validator",
+]
+
+[[package]]
+name = "openportio-core"
+version = "0.1.0"
+dependencies = [
+ "jsonwebtoken",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "openportio-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "openportio-rpc"
+version = "0.1.0"
+dependencies = [
+ "openportio-core",
+ "prost",
+ "prost-types",
+ "protoc-bin-vendored",
+ "serde_json",
+ "tempfile",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
+name = "openportio-server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures-util",
+ "http",
+ "jsonwebtoken",
+ "openportio-core",
+ "openportio-macros",
+ "openportio-rpc",
+ "proptest",
+ "pulldown-cmark",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "tonic",
+ "tonic-reflection",
+ "tower 0.5.3",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-swagger-ui",
+ "validator",
+]
 
 [[package]]
 name = "p256"
@@ -1770,8 +1770,8 @@ dependencies = [
  "axum",
  "chrono",
  "home",
- "meld-core",
- "meld-server",
+ "openportio-core",
+ "openportio-server",
  "serde",
  "serde_json",
  "sqlx",
@@ -2501,8 +2501,8 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "futures-util",
- "meld-core",
- "meld-server",
+ "openportio-core",
+ "openportio-server",
  "serde",
  "serde_json",
  "tokio",

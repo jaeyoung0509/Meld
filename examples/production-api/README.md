@@ -1,6 +1,6 @@
 # production-api
 
-Production-oriented reference example for Meld.
+Production-oriented reference example for Openportio.
 
 This example demonstrates:
 - explicit env configuration validation
@@ -37,7 +37,7 @@ export PROD_API_DATABASE_URL="postgres://${PROD_API_DB_USER}:${PROD_API_DB_PASSW
 export PROD_API_ADDR='127.0.0.1:4100'
 export PROD_API_SERVICE_NAME='production-api'
 export PROD_API_RUN_MIGRATIONS='true'
-export MELD_AUTH_ENABLED='true'
+export OPENPORTIO_AUTH_ENABLED='true'
 
 cargo run -p production-api
 ```
@@ -62,9 +62,9 @@ Create dev token:
 
 ```bash
 TOKEN=$(python3 scripts/generate_dev_jwt.py \
-  --secret "${MELD_AUTH_JWT_SECRET}" \
-  --issuer "${MELD_AUTH_ISSUER}" \
-  --audience "${MELD_AUTH_AUDIENCE}")
+  --secret "${OPENPORTIO_AUTH_JWT_SECRET}" \
+  --issuer "${OPENPORTIO_AUTH_ISSUER}" \
+  --audience "${OPENPORTIO_AUTH_AUDIENCE}")
 ```
 
 Create/list with token:
@@ -100,11 +100,11 @@ Without token (expected `UNAUTHENTICATED`):
 
 ```bash
 grpcurl -plaintext \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:4100 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 With token (expected success):
@@ -112,11 +112,11 @@ With token (expected success):
 ```bash
 grpcurl -plaintext \
   -H "authorization: Bearer ${TOKEN}" \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:4100 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 ## Failure Recovery Basics
@@ -152,7 +152,7 @@ curl -i http://127.0.0.1:4100/readyz
 - `missing required environment variable: PROD_API_DATABASE_URL`
   - Set `PROD_API_DATABASE_URL` before running.
 - `401 unauthorized` on `/v1/notes` or `/protected/*`
-  - Verify `MELD_AUTH_ENABLED`, `MELD_AUTH_JWT_SECRET`, `MELD_AUTH_ISSUER`, `MELD_AUTH_AUDIENCE`.
+  - Verify `OPENPORTIO_AUTH_ENABLED`, `OPENPORTIO_AUTH_JWT_SECRET`, `OPENPORTIO_AUTH_ISSUER`, `OPENPORTIO_AUTH_AUDIENCE`.
   - Recreate token with `scripts/generate_dev_jwt.py`.
 - `UNAUTHENTICATED` in gRPC call
   - Confirm `authorization: Bearer <token>` metadata and issuer/audience match.

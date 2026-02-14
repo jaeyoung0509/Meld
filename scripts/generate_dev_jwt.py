@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a dev-only HS256 JWT for local Meld auth testing."""
+"""Generate a dev-only HS256 JWT for local Openportio auth testing."""
 
 from __future__ import annotations
 

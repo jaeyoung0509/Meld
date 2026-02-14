@@ -8,22 +8,22 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use meld_core::AppState;
-use meld_server::{
+use openportio_core::AppState;
+use openportio_server::{
     api::{bad_request, ApiError},
     di::Depends,
-    MeldServer,
+    OpenportioServer,
 };
 use serde::{Deserialize, Serialize};
 use tokio_stream::{once, wrappers::IntervalStream, Stream, StreamExt};
 
-#[meld_server::dto]
+#[openportio_server::dto]
 struct NotePath {
     #[validate(length(min = 3))]
     id: String,
 }
 
-#[meld_server::dto]
+#[openportio_server::dto]
 struct NoteQuery {
     #[validate(length(max = 80))]
     q: Option<String>,
@@ -31,7 +31,7 @@ struct NoteQuery {
     limit: Option<u32>,
 }
 
-#[meld_server::dto]
+#[openportio_server::dto]
 struct CreateNoteBody {
     #[validate(length(min = 2, max = 120))]
     title: String,
@@ -93,7 +93,7 @@ where
     }
 }
 
-#[meld_server::route(get, "/notes/:id", auto_validate)]
+#[openportio_server::route(get, "/notes/:id", auto_validate)]
 async fn get_note(
     ctx: RequestContext,
     Depends(service): Depends<ServiceInfo>,
@@ -111,7 +111,7 @@ async fn get_note(
     }))
 }
 
-#[meld_server::route(get, "/notes", auto_validate)]
+#[openportio_server::route(get, "/notes", auto_validate)]
 async fn list_notes(
     axum::extract::Query(query): axum::extract::Query<NoteQuery>,
 ) -> Json<NotesListResponse> {
@@ -121,7 +121,7 @@ async fn list_notes(
     })
 }
 
-#[meld_server::route(post, "/notes", auto_validate)]
+#[openportio_server::route(post, "/notes", auto_validate)]
 async fn create_note(
     ctx: RequestContext,
     Depends(service): Depends<ServiceInfo>,
@@ -135,7 +135,7 @@ async fn create_note(
     })
 }
 
-#[meld_server::route(post, "/notes/raw")]
+#[openportio_server::route(post, "/notes/raw")]
 async fn create_note_raw(Json(body): Json<CreateNoteBody>) -> Json<NoteResponse> {
     Json(NoteResponse {
         id: "note-raw".to_string(),
@@ -251,7 +251,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/notes/:id", get(get_note))
         .with_state(state.clone());
 
-    MeldServer::new()
+    OpenportioServer::new()
         .with_state(state)
         .with_rest_router(custom_router)
         .with_addr(SocketAddr::from(([127, 0, 0, 1], 4000)))
@@ -303,7 +303,7 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("body bytes");
-        let parsed: meld_server::api::ApiErrorResponse =
+        let parsed: openportio_server::api::ApiErrorResponse =
             serde_json::from_slice(&body).expect("api error json");
         assert_eq!(parsed.code, "validation_error");
         let detail = parsed.detail.expect("validation detail should exist");
@@ -354,7 +354,7 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("body bytes");
-        let parsed: meld_server::api::ApiErrorResponse =
+        let parsed: openportio_server::api::ApiErrorResponse =
             serde_json::from_slice(&body).expect("api error json");
         assert_eq!(parsed.code, "validation_error");
         let detail = parsed.detail.expect("validation detail should exist");
@@ -380,7 +380,7 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("body bytes");
-        let parsed: meld_server::api::ApiErrorResponse =
+        let parsed: openportio_server::api::ApiErrorResponse =
             serde_json::from_slice(&body).expect("api error json");
         assert_eq!(parsed.code, "validation_error");
         let detail = parsed.detail.expect("validation detail should exist");

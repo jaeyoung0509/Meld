@@ -5,7 +5,7 @@ This repository provides deterministic REST + gRPC performance smoke gates to de
 ## Scope
 
 - REST scenario: `k6` against `/health`
-- gRPC scenario: `ghz` against `meld.v1.Greeter/SayHello`
+- gRPC scenario: `ghz` against `openportio.v1.Greeter/SayHello`
 - Outputs saved under `target/perf`
 
 ## Local Run (One Command)
@@ -52,8 +52,8 @@ This keeps perf checks deterministic and isolates noisy throughput tests from st
 
 If false positives occur on slower hardware or noisy runners:
 
-1. increase load duration first (`MELD_PERF_REST_DURATION`) to reduce variance
-2. reduce concurrency/requests (`MELD_PERF_REST_VUS`, `MELD_PERF_GRPC_CONCURRENCY`, `MELD_PERF_GRPC_REQUESTS`)
+1. increase load duration first (`OPENPORTIO_PERF_REST_DURATION`) to reduce variance
+2. reduce concurrency/requests (`OPENPORTIO_PERF_REST_VUS`, `OPENPORTIO_PERF_GRPC_CONCURRENCY`, `OPENPORTIO_PERF_GRPC_REQUESTS`)
 3. relax thresholds incrementally (5-10ms p95 steps or 0.005 error-rate steps)
 4. record new baseline values in this document before merging changes
 

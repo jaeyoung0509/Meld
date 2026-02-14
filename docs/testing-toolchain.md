@@ -37,7 +37,7 @@ cargo llvm-cov --workspace --lcov --output-path target/coverage/lcov.info
 
 Property-based API invariants are in:
 
-- `crates/meld-server/tests/property_api.rs`
+- `crates/openportio-server/tests/property_api.rs`
 
 They validate:
 

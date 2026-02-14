@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-cargo run -p meld-server --bin openapi_docgen -- \
+cargo run -p openportio-server --bin openapi_docgen -- \
   --out docs/generated/rest-openapi.json
 
 ./scripts/generate_grpc_contract_docs.sh

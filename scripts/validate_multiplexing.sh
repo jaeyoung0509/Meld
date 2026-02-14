@@ -19,9 +19,9 @@ if ! command -v grpcurl >/dev/null 2>&1; then
 fi
 
 grpcurl -plaintext \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
-  "${ADDR}" meld.v1.Greeter/SayHello
+  "${ADDR}" openportio.v1.Greeter/SayHello
 
 echo "Done: REST + gRPC are both reachable on ${ADDR}"

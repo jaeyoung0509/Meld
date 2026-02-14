@@ -1,4 +1,4 @@
-# DX Upgrade Scorecard (Meld vs FastAPI-like Workflows)
+# DX Upgrade Scorecard (Openportio vs FastAPI-like Workflows)
 
 This document tracks the developer-experience upgrade delivered for issue `#48`.
 
@@ -17,7 +17,7 @@ struct CreateNoteBody {
 After:
 
 ```rust
-#[meld_server::dto]
+#[openportio_server::dto]
 struct CreateNoteBody {
     #[validate(length(min = 2, max = 120))]
     title: String,
@@ -30,7 +30,7 @@ Result:
 
 ## 2) Validation Error Shape
 
-Meld now returns validation failures with stable fields inspired by FastAPI-style payloads:
+Openportio now returns validation failures with stable fields inspired by FastAPI-style payloads:
 
 ```json
 {
@@ -48,7 +48,7 @@ Result:
 
 ## 3) OpenAPI Boilerplate
 
-Meld OpenAPI generation now auto-injects shared error responses:
+Openportio OpenAPI generation now auto-injects shared error responses:
 - `400` (validation / bad request)
 - `500` (internal error)
 - `401` for `/protected/*` routes
@@ -60,9 +60,9 @@ Result:
 ## 4) DI Ergonomics
 
 Added provider-style override utilities:
-- `MeldServer::with_dependency(value)`
-- `meld_server::di::with_dependency(...)`
-- `meld_server::di::with_dependency_overrides(...)`
+- `OpenportioServer::with_dependency(value)`
+- `openportio_server::di::with_dependency(...)`
+- `openportio_server::di::with_dependency_overrides(...)`
 
 Result:
 - Cleaner test-time wiring for multiple dependencies

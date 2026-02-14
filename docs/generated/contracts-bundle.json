@@ -13,11 +13,11 @@
     "method_count": 1,
     "methods": [
       {
-        "grpc_method": "meld.v1.Greeter/SayHello",
+        "grpc_method": "openportio.v1.Greeter/SayHello",
         "http_method": "POST",
-        "path": "/meld.v1.Greeter/SayHello",
-        "request_schema_ref": "#/components/schemas/meld.v1.HelloRequest",
-        "response_schema_ref": "#/components/schemas/meld.v1.HelloResponse",
+        "path": "/openportio.v1.Greeter/SayHello",
+        "request_schema_ref": "#/components/schemas/openportio.v1.HelloRequest",
+        "response_schema_ref": "#/components/schemas/openportio.v1.HelloResponse",
         "summary": "Greeter.SayHello"
       }
     ]
@@ -25,8 +25,8 @@
   "links": [
     {
       "grpc_http_method": "POST",
-      "grpc_method": "meld.v1.Greeter/SayHello",
-      "grpc_path": "/meld.v1.Greeter/SayHello",
+      "grpc_method": "openportio.v1.Greeter/SayHello",
+      "grpc_path": "/openportio.v1.Greeter/SayHello",
       "notes": "REST hello endpoint mirrors gRPC Greeter.SayHello request/response semantics.",
       "rest_method": "GET",
       "rest_operation_id": "hello",

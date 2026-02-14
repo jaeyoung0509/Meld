@@ -4,21 +4,21 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-MELD_PERF_BOOT_SERVER="${MELD_PERF_BOOT_SERVER:-true}"
-MELD_PERF_WAIT_SECONDS="${MELD_PERF_WAIT_SECONDS:-120}"
-MELD_PERF_BASE_URL="${MELD_PERF_BASE_URL:-http://127.0.0.1:3000}"
-MELD_PERF_GRPC_ADDR="${MELD_PERF_GRPC_ADDR:-127.0.0.1:3000}"
+OPENPORTIO_PERF_BOOT_SERVER="${OPENPORTIO_PERF_BOOT_SERVER:-true}"
+OPENPORTIO_PERF_WAIT_SECONDS="${OPENPORTIO_PERF_WAIT_SECONDS:-120}"
+OPENPORTIO_PERF_BASE_URL="${OPENPORTIO_PERF_BASE_URL:-http://127.0.0.1:3000}"
+OPENPORTIO_PERF_GRPC_ADDR="${OPENPORTIO_PERF_GRPC_ADDR:-127.0.0.1:3000}"
 
-MELD_PERF_REST_PATH="${MELD_PERF_REST_PATH:-/health}"
-MELD_PERF_REST_VUS="${MELD_PERF_REST_VUS:-20}"
-MELD_PERF_REST_DURATION="${MELD_PERF_REST_DURATION:-12s}"
-MELD_PERF_REST_P95_MS="${MELD_PERF_REST_P95_MS:-120}"
-MELD_PERF_REST_ERR_RATE="${MELD_PERF_REST_ERR_RATE:-0.01}"
+OPENPORTIO_PERF_REST_PATH="${OPENPORTIO_PERF_REST_PATH:-/health}"
+OPENPORTIO_PERF_REST_VUS="${OPENPORTIO_PERF_REST_VUS:-20}"
+OPENPORTIO_PERF_REST_DURATION="${OPENPORTIO_PERF_REST_DURATION:-12s}"
+OPENPORTIO_PERF_REST_P95_MS="${OPENPORTIO_PERF_REST_P95_MS:-120}"
+OPENPORTIO_PERF_REST_ERR_RATE="${OPENPORTIO_PERF_REST_ERR_RATE:-0.01}"
 
-MELD_PERF_GRPC_REQUESTS="${MELD_PERF_GRPC_REQUESTS:-500}"
-MELD_PERF_GRPC_CONCURRENCY="${MELD_PERF_GRPC_CONCURRENCY:-25}"
-MELD_PERF_GRPC_P95_MS="${MELD_PERF_GRPC_P95_MS:-120}"
-MELD_PERF_GRPC_ERR_RATE="${MELD_PERF_GRPC_ERR_RATE:-0.01}"
+OPENPORTIO_PERF_GRPC_REQUESTS="${OPENPORTIO_PERF_GRPC_REQUESTS:-500}"
+OPENPORTIO_PERF_GRPC_CONCURRENCY="${OPENPORTIO_PERF_GRPC_CONCURRENCY:-25}"
+OPENPORTIO_PERF_GRPC_P95_MS="${OPENPORTIO_PERF_GRPC_P95_MS:-120}"
+OPENPORTIO_PERF_GRPC_ERR_RATE="${OPENPORTIO_PERF_GRPC_ERR_RATE:-0.01}"
 
 PERF_DIR="target/perf"
 SERVER_PID=""
@@ -68,18 +68,18 @@ wait_for_server() {
 }
 
 start_server_if_needed() {
-  if ! is_truthy "$MELD_PERF_BOOT_SERVER"; then
+  if ! is_truthy "$OPENPORTIO_PERF_BOOT_SERVER"; then
     return 0
   fi
 
   SERVER_LOG="$(mktemp)"
-  cargo run -p meld-server --bin meld-server >"$SERVER_LOG" 2>&1 &
+  cargo run -p openportio-server --bin openportio-server >"$SERVER_LOG" 2>&1 &
   SERVER_PID="$!"
 
-  if wait_for_server "$MELD_PERF_BASE_URL" "$MELD_PERF_WAIT_SECONDS"; then
-    echo "[OK] meld-server booted for perf gate"
+  if wait_for_server "$OPENPORTIO_PERF_BASE_URL" "$OPENPORTIO_PERF_WAIT_SECONDS"; then
+    echo "[OK] openportio-server booted for perf gate"
   else
-    echo "[FAIL] server boot failed within ${MELD_PERF_WAIT_SECONDS}s"
+    echo "[FAIL] server boot failed within ${OPENPORTIO_PERF_WAIT_SECONDS}s"
     if [[ -f "$SERVER_LOG" ]]; then
       echo "[INFO] server log tail:"
       tail -n 80 "$SERVER_LOG" || true
@@ -91,12 +91,12 @@ start_server_if_needed() {
 run_rest_k6() {
   echo "[REST] running k6 scenario"
 
-  K6_REST_BASE_URL="$MELD_PERF_BASE_URL" \
-  K6_REST_PATH="$MELD_PERF_REST_PATH" \
-  K6_REST_VUS="$MELD_PERF_REST_VUS" \
-  K6_REST_DURATION="$MELD_PERF_REST_DURATION" \
-  K6_REST_P95_MS="$MELD_PERF_REST_P95_MS" \
-  K6_REST_ERR_RATE="$MELD_PERF_REST_ERR_RATE" \
+  K6_REST_BASE_URL="$OPENPORTIO_PERF_BASE_URL" \
+  K6_REST_PATH="$OPENPORTIO_PERF_REST_PATH" \
+  K6_REST_VUS="$OPENPORTIO_PERF_REST_VUS" \
+  K6_REST_DURATION="$OPENPORTIO_PERF_REST_DURATION" \
+  K6_REST_P95_MS="$OPENPORTIO_PERF_REST_P95_MS" \
+  K6_REST_ERR_RATE="$OPENPORTIO_PERF_REST_ERR_RATE" \
   k6 run \
     --summary-export "$PERF_DIR/rest-k6-summary.json" \
     perf/rest_smoke.js
@@ -107,18 +107,18 @@ run_grpc_ghz() {
 
   ghz \
     --insecure \
-    --proto crates/meld-rpc/proto/service.proto \
-    --call meld.v1.Greeter.SayHello \
+    --proto crates/openportio-rpc/proto/service.proto \
+    --call openportio.v1.Greeter.SayHello \
     --data '{"name":"perf"}' \
-    --total "$MELD_PERF_GRPC_REQUESTS" \
-    --concurrency "$MELD_PERF_GRPC_CONCURRENCY" \
+    --total "$OPENPORTIO_PERF_GRPC_REQUESTS" \
+    --concurrency "$OPENPORTIO_PERF_GRPC_CONCURRENCY" \
     --format json \
     --output "$PERF_DIR/grpc-ghz-summary.json" \
-    "$MELD_PERF_GRPC_ADDR"
+    "$OPENPORTIO_PERF_GRPC_ADDR"
 }
 
 analyze_grpc_result() {
-  python3 - "$PERF_DIR/grpc-ghz-summary.json" "$MELD_PERF_GRPC_P95_MS" "$MELD_PERF_GRPC_ERR_RATE" <<'PY'
+  python3 - "$PERF_DIR/grpc-ghz-summary.json" "$OPENPORTIO_PERF_GRPC_P95_MS" "$OPENPORTIO_PERF_GRPC_ERR_RATE" <<'PY'
 import json
 import re
 import sys
@@ -220,10 +220,10 @@ REST summary: $PERF_DIR/rest-k6-summary.json
 gRPC summary: $PERF_DIR/grpc-ghz-summary.json
 gRPC evaluation: $PERF_DIR/grpc-evaluation.txt
 Thresholds:
-  REST p95 <= ${MELD_PERF_REST_P95_MS}ms
-  REST error rate <= ${MELD_PERF_REST_ERR_RATE}
-  gRPC p95 <= ${MELD_PERF_GRPC_P95_MS}ms
-  gRPC error rate <= ${MELD_PERF_GRPC_ERR_RATE}
+  REST p95 <= ${OPENPORTIO_PERF_REST_P95_MS}ms
+  REST error rate <= ${OPENPORTIO_PERF_REST_ERR_RATE}
+  gRPC p95 <= ${OPENPORTIO_PERF_GRPC_P95_MS}ms
+  gRPC error rate <= ${OPENPORTIO_PERF_GRPC_ERR_RATE}
 SUMMARY
 
   echo "[OK] perf gate passed"

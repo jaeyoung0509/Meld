@@ -65,19 +65,19 @@ jobs:
 
       - name: Run perf gate
         env:
-          MELD_PERF_BOOT_SERVER: "true"
-          MELD_PERF_WAIT_SECONDS: "120"
-          MELD_PERF_BASE_URL: "http://127.0.0.1:3000"
-          MELD_PERF_GRPC_ADDR: "127.0.0.1:3000"
-          MELD_PERF_REST_PATH: "/health"
-          MELD_PERF_REST_VUS: ${{ inputs.rest_vus }}
-          MELD_PERF_REST_DURATION: ${{ inputs.rest_duration }}
-          MELD_PERF_REST_P95_MS: ${{ inputs.rest_p95_ms }}
-          MELD_PERF_REST_ERR_RATE: ${{ inputs.rest_error_rate }}
-          MELD_PERF_GRPC_REQUESTS: ${{ inputs.grpc_requests }}
-          MELD_PERF_GRPC_CONCURRENCY: ${{ inputs.grpc_concurrency }}
-          MELD_PERF_GRPC_P95_MS: ${{ inputs.grpc_p95_ms }}
-          MELD_PERF_GRPC_ERR_RATE: ${{ inputs.grpc_error_rate }}
+          OPENPORTIO_PERF_BOOT_SERVER: "true"
+          OPENPORTIO_PERF_WAIT_SECONDS: "120"
+          OPENPORTIO_PERF_BASE_URL: "http://127.0.0.1:3000"
+          OPENPORTIO_PERF_GRPC_ADDR: "127.0.0.1:3000"
+          OPENPORTIO_PERF_REST_PATH: "/health"
+          OPENPORTIO_PERF_REST_VUS: ${{ inputs.rest_vus }}
+          OPENPORTIO_PERF_REST_DURATION: ${{ inputs.rest_duration }}
+          OPENPORTIO_PERF_REST_P95_MS: ${{ inputs.rest_p95_ms }}
+          OPENPORTIO_PERF_REST_ERR_RATE: ${{ inputs.rest_error_rate }}
+          OPENPORTIO_PERF_GRPC_REQUESTS: ${{ inputs.grpc_requests }}
+          OPENPORTIO_PERF_GRPC_CONCURRENCY: ${{ inputs.grpc_concurrency }}
+          OPENPORTIO_PERF_GRPC_P95_MS: ${{ inputs.grpc_p95_ms }}
+          OPENPORTIO_PERF_GRPC_ERR_RATE: ${{ inputs.grpc_error_rate }}
         run: ./scripts/perf_gate.sh
 
       - name: Upload perf artifacts

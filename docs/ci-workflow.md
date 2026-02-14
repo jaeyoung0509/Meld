@@ -16,11 +16,11 @@ This project uses focused CI jobs so failures are clearly scoped:
 - uploads `coverage-report` artifact (summary + lcov)
 
 4. `REST gRPC E2E`
-- `cargo test -p meld-server --test multiplexing -- --nocapture`
+- `cargo test -p openportio-server --test multiplexing -- --nocapture`
 
 5. `Docs Contract Drift Check`
 - `./scripts/check_contracts_bundle.sh`
-- `cargo test -p meld-server openapi_json_is_available -- --nocapture`
+- `cargo test -p openportio-server openapi_json_is_available -- --nocapture`
 
 6. `Security Audit`
 - `cargo audit`

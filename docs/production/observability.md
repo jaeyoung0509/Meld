@@ -1,6 +1,6 @@
 # Observability Guide
 
-Meld includes basic observability primitives through middleware and tracing.
+Openportio includes basic observability primitives through middleware and tracing.
 
 ## Built-in Signals
 
@@ -16,13 +16,13 @@ Meld includes basic observability primitives through middleware and tracing.
 Set log level using standard Rust tracing environment:
 
 ```bash
-RUST_LOG=info cargo run -p meld-server
+RUST_LOG=info cargo run -p openportio-server
 ```
 
 For deeper diagnostics:
 
 ```bash
-RUST_LOG=debug,meld_server=debug cargo run -p meld-server
+RUST_LOG=debug,openportio_server=debug cargo run -p openportio-server
 ```
 
 ## Runtime Verification
@@ -30,7 +30,7 @@ RUST_LOG=debug,meld_server=debug cargo run -p meld-server
 Use preflight endpoint checks:
 
 ```bash
-MELD_PREFLIGHT_BOOT_SERVER=true ./scripts/prod_preflight.sh
+OPENPORTIO_PREFLIGHT_BOOT_SERVER=true ./scripts/prod_preflight.sh
 ```
 
 This validates:

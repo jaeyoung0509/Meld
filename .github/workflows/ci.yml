@@ -1,4 +1,4 @@
-name: Meld CI
+name: Openportio CI
 
 on:
   pull_request:
@@ -105,7 +105,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run multiplexing integration test
-        run: cargo test -p meld-server --test multiplexing -- --nocapture
+        run: cargo test -p openportio-server --test multiplexing -- --nocapture
 
   docs-contract:
     name: Docs Contract Drift Check
@@ -126,7 +126,7 @@ jobs:
         run: ./scripts/check_contracts_bundle.sh
 
       - name: Verify OpenAPI route test
-        run: cargo test -p meld-server openapi_json_is_available -- --nocapture
+        run: cargo test -p openportio-server openapi_json_is_available -- --nocapture
 
   security-audit:
     name: Security Audit
@@ -162,18 +162,18 @@ jobs:
 
       - name: Run production preflight gate
         env:
-          MELD_PREFLIGHT_SECURE: "true"
-          MELD_PREFLIGHT_BOOT_SERVER: "true"
-          MELD_PREFLIGHT_WAIT_SECONDS: "120"
-          MELD_PREFLIGHT_BASE_URL: "http://127.0.0.1:3000"
-          MELD_AUTH_ENABLED: "true"
-          MELD_AUTH_JWT_SECRET: "ci-dev-secret"
-          MELD_AUTH_ISSUER: "https://issuer.local"
-          MELD_AUTH_AUDIENCE: "meld-api"
-          MELD_CORS_ALLOW_ORIGINS: "https://app.example.com"
-          MELD_TIMEOUT_SECONDS: "15"
-          MELD_REQUEST_BODY_LIMIT_BYTES: "1048576"
-          MELD_MAX_IN_FLIGHT_REQUESTS: "1024"
+          OPENPORTIO_PREFLIGHT_SECURE: "true"
+          OPENPORTIO_PREFLIGHT_BOOT_SERVER: "true"
+          OPENPORTIO_PREFLIGHT_WAIT_SECONDS: "120"
+          OPENPORTIO_PREFLIGHT_BASE_URL: "http://127.0.0.1:3000"
+          OPENPORTIO_AUTH_ENABLED: "true"
+          OPENPORTIO_AUTH_JWT_SECRET: "ci-dev-secret"
+          OPENPORTIO_AUTH_ISSUER: "https://issuer.local"
+          OPENPORTIO_AUTH_AUDIENCE: "openportio-api"
+          OPENPORTIO_CORS_ALLOW_ORIGINS: "https://app.example.com"
+          OPENPORTIO_TIMEOUT_SECONDS: "15"
+          OPENPORTIO_REQUEST_BODY_LIMIT_BYTES: "1048576"
+          OPENPORTIO_MAX_IN_FLIGHT_REQUESTS: "1024"
         run: ./scripts/prod_preflight.sh
 
   release-dry-run:

@@ -6,8 +6,8 @@ license.workspace = true
 publish = false
 
 [dependencies]
-meld-core = { path = "../../crates/meld-core" }
-meld-server = { path = "../../crates/meld-server" }
+openportio-core = { path = "../../crates/openportio-core" }
+openportio-server = { path = "../../crates/openportio-server" }
 axum.workspace = true
 serde.workspace = true
 serde_json.workspace = true

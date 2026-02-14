@@ -1,8 +1,10 @@
-# Meld
+# Openportio
 
-![Meld Logo](docs/assets/meld-logo.svg)
+![Openportio Logo](docs/assets/openportio-logo.svg)
 
-Meld is a Rust server framework focused on **FastAPI-like developer ergonomics** with **single-port REST + gRPC** delivery.
+Openportio is a Rust server framework focused on **FastAPI-like developer ergonomics** with **single-port REST + gRPC** delivery.
+
+> Migration note: the project was renamed from `Meld` to `Openportio`. Runtime keeps `MELD_*` env aliases for backward compatibility, but new setups should use `OPENPORTIO_*`.
 
 ## What You Get
 
@@ -23,12 +25,12 @@ Meld is a Rust server framework focused on **FastAPI-like developer ergonomics**
 - Optional REST auth-protected route:
   - `/protected/whoami`
 - Fluent server builder API:
-  - `MeldServer::new().with_...().run()`
+  - `OpenportioServer::new().with_...().run()`
 - Single-attribute DTO macro:
-  - `#[meld_server::dto]` for `Deserialize + Validate + ToSchema`
+  - `#[openportio_server::dto]` for `Deserialize + Validate + ToSchema`
   - keep `utoipa` in your crate dependencies for schema derive expansion
 - Depends-style DI extractor with request cache:
-  - `meld_server::di::Depends<T>`
+  - `openportio_server::di::Depends<T>`
 - Shared middleware stack:
   - tracing, request-id propagation, CORS, timeout, concurrency limit
 
@@ -37,14 +39,14 @@ Meld is a Rust server framework focused on **FastAPI-like developer ergonomics**
 ### 1) Start the default server
 
 ```bash
-cargo run -p meld-server
+cargo run -p openportio-server
 ```
 
 Default address: `127.0.0.1:3000`  
 Override with:
 
 ```bash
-MELD_SERVER_ADDR=127.0.0.1:4000 cargo run -p meld-server
+OPENPORTIO_SERVER_ADDR=127.0.0.1:4000 cargo run -p openportio-server
 ```
 
 ### 2) Verify REST
@@ -57,24 +59,25 @@ curl -N http://127.0.0.1:3000/events
 ```
 
 WebSocket defaults:
-- max text frame: `4096` bytes (`MELD_WS_MAX_TEXT_BYTES`)
-- idle timeout: `45` seconds (`MELD_WS_IDLE_TIMEOUT_SECS`)
+- max text frame: `4096` bytes (`OPENPORTIO_WS_MAX_TEXT_BYTES`)
+- idle timeout: `45` seconds (`OPENPORTIO_WS_IDLE_TIMEOUT_SECS`)
 
 Middleware defaults:
-- request timeout: `15` seconds (`MELD_TIMEOUT_SECONDS`)
-- max in-flight requests: `1024` (`MELD_MAX_IN_FLIGHT_REQUESTS`)
-- request body limit: `1048576` bytes (`MELD_REQUEST_BODY_LIMIT_BYTES`)
-- CORS: disabled by default; set `MELD_CORS_ALLOW_ORIGINS` to a comma-separated allowlist (use `*` only when you intentionally want wildcard CORS)
+- request timeout: `15` seconds (`OPENPORTIO_TIMEOUT_SECONDS`)
+- max in-flight requests: `1024` (`OPENPORTIO_MAX_IN_FLIGHT_REQUESTS`)
+- request body limit: `1048576` bytes (`OPENPORTIO_REQUEST_BODY_LIMIT_BYTES`)
+- CORS: disabled by default; set `OPENPORTIO_CORS_ALLOW_ORIGINS` to a comma-separated allowlist (use `*` only when you intentionally want wildcard CORS)
 
 Auth defaults:
-- disabled by default (`MELD_AUTH_ENABLED=false`)
-- when enabled, JWT HMAC secret required (`MELD_AUTH_JWT_SECRET`)
+- disabled by default (`OPENPORTIO_AUTH_ENABLED=false`)
+- when enabled, JWT HMAC secret required (`OPENPORTIO_AUTH_JWT_SECRET`)
 - optional issuer/audience checks:
-  - `MELD_AUTH_ISSUER`
-  - `MELD_AUTH_AUDIENCE`
+  - `OPENPORTIO_AUTH_ISSUER`
+  - `OPENPORTIO_AUTH_AUDIENCE`
 - `/protected/whoami` behavior:
   - auth disabled: returns `200` with anonymous principal
   - auth enabled: requires bearer JWT and returns `401` when missing/invalid
+- compatibility aliases (deprecated): `MELD_AUTH_*`, `MELD_TIMEOUT_SECONDS`, `MELD_SERVER_ADDR`, and other `MELD_*` runtime keys are still accepted.
 
 ### 3) Verify gRPC (auth disabled)
 
@@ -83,11 +86,11 @@ Auth defaults:
 ```bash
 grpcurl -plaintext 127.0.0.1:3000 list
 grpcurl -plaintext \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:3000 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 ### 4) Verify gRPC (auth enabled)
@@ -95,22 +98,22 @@ grpcurl -plaintext \
 Restart server with auth enabled:
 
 ```bash
-MELD_AUTH_ENABLED=true \
-MELD_AUTH_JWT_SECRET=dev-secret \
-MELD_AUTH_ISSUER=https://issuer.local \
-MELD_AUTH_AUDIENCE=meld-api \
-cargo run -p meld-server
+OPENPORTIO_AUTH_ENABLED=true \
+OPENPORTIO_AUTH_JWT_SECRET=dev-secret \
+OPENPORTIO_AUTH_ISSUER=https://issuer.local \
+OPENPORTIO_AUTH_AUDIENCE=openportio-api \
+cargo run -p openportio-server
 ```
 
 Call without token (expected: `UNAUTHENTICATED`):
 
 ```bash
 grpcurl -plaintext \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:3000 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 Generate a dev token (development only):
@@ -119,7 +122,7 @@ Generate a dev token (development only):
 TOKEN=$(python3 scripts/generate_dev_jwt.py \
   --secret dev-secret \
   --issuer https://issuer.local \
-  --audience meld-api)
+  --audience openportio-api)
 ```
 
 Call with token (expected: success):
@@ -127,11 +130,11 @@ Call with token (expected: success):
 ```bash
 grpcurl -plaintext \
   -H "authorization: Bearer ${TOKEN}" \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:3000 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 ### 5) Open docs
@@ -145,13 +148,13 @@ grpcurl -plaintext \
 ## Repository Layout
 
 ```text
-crates/meld-core     # domain, state, error model
-crates/meld-rpc      # proto, tonic codegen, grpc-docgen tool
-crates/meld-server   # REST + gRPC routing, middleware, builder API
+crates/openportio-core     # domain, state, error model
+crates/openportio-rpc      # proto, tonic codegen, grpc-docgen tool
+crates/openportio-server   # REST + gRPC routing, middleware, builder API
 contracts/           # explicit REST <-> gRPC mapping definitions
 examples/production-api
 examples/simple-server
-examples/meld-app
+examples/openportio-app
 docs/
 scripts/
 ```
@@ -161,11 +164,11 @@ scripts/
 ```rust
 use std::net::SocketAddr;
 
-use meld_server::MeldServer;
+use openportio_server::OpenportioServer;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    MeldServer::new()
+    OpenportioServer::new()
         .with_addr(SocketAddr::from(([127, 0, 0, 1], 3000)))
         .run()
         .await?;
@@ -180,7 +183,7 @@ See:
 - `examples/production-api/src/main.rs`
 - `examples/simple-server/README.md`
 - `examples/simple-server/src/main.rs`
-- `examples/meld-app/src/main.rs` (dependency-rename-safe macro usage)
+- `examples/openportio-app/src/main.rs` (dependency-rename-safe macro usage)
 
 ## Contract Artifact Generation
 
@@ -247,13 +250,13 @@ See `docs/performance-gates.md` for thresholds, artifacts, and tuning.
 Run production preflight locally:
 
 ```bash
-MELD_PREFLIGHT_SECURE=true \
-MELD_PREFLIGHT_BOOT_SERVER=true \
-MELD_AUTH_ENABLED=true \
-MELD_AUTH_JWT_SECRET=replace-me \
-MELD_AUTH_ISSUER=https://issuer.local \
-MELD_AUTH_AUDIENCE=meld-api \
-MELD_CORS_ALLOW_ORIGINS=https://app.example.com \
+OPENPORTIO_PREFLIGHT_SECURE=true \
+OPENPORTIO_PREFLIGHT_BOOT_SERVER=true \
+OPENPORTIO_AUTH_ENABLED=true \
+OPENPORTIO_AUTH_JWT_SECRET=replace-me \
+OPENPORTIO_AUTH_ISSUER=https://issuer.local \
+OPENPORTIO_AUTH_AUDIENCE=openportio-api \
+OPENPORTIO_CORS_ALLOW_ORIGINS=https://app.example.com \
 ./scripts/prod_preflight.sh
 ```
 
@@ -282,4 +285,4 @@ Core roadmap items are implemented:
 - `#19` descriptor-based gRPC docs generator complete
 
 Follow-up improvements continue via GitHub issues on:
-[jaeyoung0509/meld](https://github.com/jaeyoung0509/meld)
+[jaeyoung0509/Openportio](https://github.com/jaeyoung0509/Openportio)

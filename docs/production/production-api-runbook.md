@@ -18,10 +18,10 @@ Optional (defaults shown):
 
 Auth-related (recommended for realistic production flow):
 
-- `MELD_AUTH_ENABLED=true`
-- `MELD_AUTH_JWT_SECRET=<local-only-secret>`
-- `MELD_AUTH_ISSUER=<issuer>`
-- `MELD_AUTH_AUDIENCE=<audience>`
+- `OPENPORTIO_AUTH_ENABLED=true`
+- `OPENPORTIO_AUTH_JWT_SECRET=<local-only-secret>`
+- `OPENPORTIO_AUTH_ISSUER=<issuer>`
+- `OPENPORTIO_AUTH_AUDIENCE=<audience>`
 
 ## Boot Procedure
 
@@ -42,7 +42,7 @@ source examples/production-api/.env.local
 set +a
 
 export PROD_API_DATABASE_URL="postgres://${PROD_API_DB_USER}:${PROD_API_DB_PASSWORD}@127.0.0.1:55432/${PROD_API_DB_NAME}"
-export MELD_AUTH_ENABLED='true'
+export OPENPORTIO_AUTH_ENABLED='true'
 
 cargo run -p production-api
 ```
@@ -67,9 +67,9 @@ REST:
 
 ```bash
 TOKEN=$(python3 scripts/generate_dev_jwt.py \
-  --secret "${MELD_AUTH_JWT_SECRET}" \
-  --issuer "${MELD_AUTH_ISSUER}" \
-  --audience "${MELD_AUTH_AUDIENCE}")
+  --secret "${OPENPORTIO_AUTH_JWT_SECRET}" \
+  --issuer "${OPENPORTIO_AUTH_ISSUER}" \
+  --audience "${OPENPORTIO_AUTH_AUDIENCE}")
 
 curl -i http://127.0.0.1:4100/v1/notes
 
@@ -90,11 +90,11 @@ gRPC:
 ```bash
 grpcurl -plaintext \
   -H "authorization: Bearer ${TOKEN}" \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:4100 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 ## Failure Recovery

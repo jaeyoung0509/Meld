@@ -8,11 +8,11 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Utc};
-use meld_core::{auth::AuthPrincipal, AppState};
-use meld_server::{
+use openportio_core::{auth::AuthPrincipal, AppState};
+use openportio_server::{
     api::{ApiError, ApiErrorResponse},
     auth::{self, AuthRuntimeConfig},
-    MeldServer,
+    OpenportioServer,
 };
 use serde::Serialize;
 use sqlx::{postgres::PgPoolOptions, FromRow, PgPool};
@@ -182,7 +182,7 @@ struct NoteRow {
     created_at: DateTime<Utc>,
 }
 
-#[meld_server::dto]
+#[openportio_server::dto]
 struct CreateNoteBody {
     #[validate(length(min = 2, max = 120))]
     title: String,
@@ -190,24 +190,24 @@ struct CreateNoteBody {
     body: Option<String>,
 }
 
-#[meld_server::dto]
+#[openportio_server::dto]
 struct ListNotesQuery {
     #[validate(range(min = 1, max = 100))]
     limit: Option<i64>,
 }
 
-#[meld_server::dto]
+#[openportio_server::dto]
 struct NotePath {
     #[validate(range(min = 1))]
     id: i64,
 }
 
-#[meld_server::route(get, "/livez")]
+#[openportio_server::route(get, "/livez")]
 async fn livez() -> Json<StatusResponse> {
     Json(StatusResponse { status: "live" })
 }
 
-#[meld_server::route(get, "/health")]
+#[openportio_server::route(get, "/health")]
 async fn health(State(state): State<Arc<ProductionApiState>>) -> Json<HealthResponse> {
     Json(HealthResponse {
         status: "ok",
@@ -215,7 +215,7 @@ async fn health(State(state): State<Arc<ProductionApiState>>) -> Json<HealthResp
     })
 }
 
-#[meld_server::route(get, "/readyz")]
+#[openportio_server::route(get, "/readyz")]
 async fn readyz(
     State(state): State<Arc<ProductionApiState>>,
 ) -> Result<Json<ReadyResponse>, ApiError> {
@@ -230,7 +230,7 @@ async fn readyz(
     }))
 }
 
-#[meld_server::route(post, "/v1/notes", auto_validate)]
+#[openportio_server::route(post, "/v1/notes", auto_validate)]
 async fn create_note(
     Extension(principal): Extension<AuthPrincipal>,
     State(state): State<Arc<ProductionApiState>>,
@@ -257,7 +257,7 @@ async fn create_note(
     Ok((StatusCode::CREATED, Json(note.into_response())))
 }
 
-#[meld_server::route(get, "/v1/notes", auto_validate)]
+#[openportio_server::route(get, "/v1/notes", auto_validate)]
 async fn list_notes(
     Extension(principal): Extension<AuthPrincipal>,
     State(state): State<Arc<ProductionApiState>>,
@@ -292,7 +292,7 @@ async fn list_notes(
     ))
 }
 
-#[meld_server::route(get, "/protected/notes/:id", auto_validate)]
+#[openportio_server::route(get, "/protected/notes/:id", auto_validate)]
 async fn get_protected_note(
     Extension(principal): Extension<AuthPrincipal>,
     State(state): State<Arc<ProductionApiState>>,
@@ -432,7 +432,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let rest_router = build_rest_router(rest_state, AuthRuntimeConfig::from_env());
 
     let grpc_state = Arc::new(AppState::local(config.service_name.clone()));
-    MeldServer::new()
+    OpenportioServer::new()
         .with_addr(config.addr)
         .with_state(grpc_state)
         .with_rest_router(rest_router)
@@ -472,7 +472,7 @@ mod tests {
     fn config_uses_defaults_when_optional_values_absent() {
         let cfg = ProductionConfig::from_lookup(|key| {
             if key == "PROD_API_DATABASE_URL" {
-                Some("postgres://127.0.0.1:55432/meld".to_string())
+                Some("postgres://127.0.0.1:55432/openportio".to_string())
             } else {
                 None
             }
@@ -490,7 +490,7 @@ mod tests {
     async fn readyz_returns_503_when_database_is_unavailable() {
         let pool = PgPoolOptions::new()
             .max_connections(1)
-            .connect_lazy("postgres://127.0.0.1:1/meld")
+            .connect_lazy("postgres://127.0.0.1:1/openportio")
             .expect("lazy pool should build");
 
         let state = Arc::new(ProductionApiState::new(
@@ -516,7 +516,7 @@ mod tests {
     async fn notes_routes_require_auth_when_enabled() {
         let pool = PgPoolOptions::new()
             .max_connections(1)
-            .connect_lazy("postgres://127.0.0.1:1/meld")
+            .connect_lazy("postgres://127.0.0.1:1/openportio")
             .expect("lazy pool should build");
 
         let state = Arc::new(ProductionApiState::new(
@@ -529,7 +529,7 @@ mod tests {
                 enabled: true,
                 jwt_secret: Some("dev-secret".to_string()),
                 expected_issuer: Some("https://issuer.local".to_string()),
-                expected_audience: Some("meld-api".to_string()),
+                expected_audience: Some("openportio-api".to_string()),
             },
         );
 

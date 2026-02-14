@@ -1,15 +1,15 @@
 # Versioning Policy
 
-Meld follows an initial `0.y.z` policy until first stable `1.0.0`.
+Openportio follows an initial `0.y.z` policy until first stable `1.0.0`.
 
 ## Baseline
 
 - Workspace crates share the same release version during the `0.x` phase.
 - Releases are coordinated for:
-  - `meld-core`
-  - `meld-macros`
-  - `meld-rpc`
-  - `meld-server`
+  - `openportio-core`
+  - `openportio-macros`
+  - `openportio-rpc`
+  - `openportio-server`
 
 ## Bump Rules
 
@@ -23,3 +23,10 @@ Each release should include:
 - migration notes (if any)
 - security-impacting changes
 - CI/release pipeline updates
+
+## Rename Migration (Meld -> Openportio)
+
+- Crate names moved to `openportio-*`.
+- Runtime env keys now use `OPENPORTIO_*`.
+- Backward-compatible env aliases (`MELD_*`) are still accepted for now, but considered deprecated.
+- Release notes must call out when deprecated aliases are removed.
