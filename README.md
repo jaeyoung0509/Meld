@@ -150,12 +150,35 @@ grpcurl -plaintext \
 - gRPC contracts (markdown): [http://127.0.0.1:3000/grpc/contracts.md](http://127.0.0.1:3000/grpc/contracts.md)
 - gRPC OpenAPI bridge: [http://127.0.0.1:3000/grpc/contracts/openapi.json](http://127.0.0.1:3000/grpc/contracts/openapi.json)
 
+## Documentation Website (VitePress)
+
+Openportio now includes a docs-only portal under `website/` so users can read documentation without browsing source folders.
+
+Run locally:
+
+```bash
+cd website
+npm install
+npm run docs:dev
+```
+
+Build:
+
+```bash
+cd website
+npm run docs:build
+```
+
+After merge to `develop` or `main`, GitHub Actions deploys the docs site to:
+- `https://jaeyoung0509.github.io/Openportio/`
+
 ## Repository Layout
 
 ```text
 crates/openportio-core     # domain, state, error model
 crates/openportio-rpc      # proto, tonic codegen, grpc-docgen tool
 crates/openportio-server   # REST + gRPC routing, middleware, builder API
+website/            # VitePress documentation portal (docs-only UX)
 contracts/           # explicit REST <-> gRPC mapping definitions
 examples/production-api
 examples/simple-server

@@ -1,4 +1,8 @@
 issues/
 target/
+node_modules/
+website/node_modules/
+website/docs/.vitepress/cache/
+website/docs/.vitepress/dist/
 
 research.md
