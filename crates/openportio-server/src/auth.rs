@@ -1,8 +1,9 @@
 use std::{
     collections::HashMap,
     env,
+    io::Read,
     str::FromStr,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
     time::{Duration, Instant},
 };
 
@@ -22,6 +23,9 @@ use tonic::Status;
 use crate::api::ApiErrorResponse;
 
 const DEFAULT_JWKS_REFRESH_SECS: u64 = 300;
+const DEFAULT_JWKS_CONNECT_TIMEOUT_SECS: u64 = 2;
+const DEFAULT_JWKS_IO_TIMEOUT_SECS: u64 = 5;
+const MAX_JWKS_RESPONSE_BYTES: usize = 64 * 1024;
 
 #[derive(Debug)]
 struct JwksProvider {
@@ -29,6 +33,7 @@ struct JwksProvider {
     refresh_interval: Duration,
     allowed_algorithms: Vec<Algorithm>,
     client: ureq::Agent,
+    refresh_lock: Mutex<()>,
     state: RwLock<JwksState>,
 }
 
@@ -44,7 +49,12 @@ impl JwksProvider {
             url,
             refresh_interval: Duration::from_secs(refresh_secs.max(1)),
             allowed_algorithms,
-            client: ureq::AgentBuilder::new().build(),
+            client: ureq::AgentBuilder::new()
+                .timeout_connect(Duration::from_secs(DEFAULT_JWKS_CONNECT_TIMEOUT_SECS))
+                .timeout_read(Duration::from_secs(DEFAULT_JWKS_IO_TIMEOUT_SECS))
+                .timeout_write(Duration::from_secs(DEFAULT_JWKS_IO_TIMEOUT_SECS))
+                .build(),
+            refresh_lock: Mutex::new(()),
             state: RwLock::new(JwksState::default()),
         }
     }
@@ -72,24 +82,27 @@ impl JwksProvider {
             return Ok((key, algorithm));
         }
 
-        if let Err(err) = self.refresh_keys() {
-            if let Some(key) = self.cached_key(&kid)? {
-                tracing::warn!(kid = %kid, error = ?err, "jwks refresh failed; using cached key");
-                return Ok((key, algorithm));
-            }
-            return Err(AuthRejection::InvalidToken(format!(
-                "unknown jwks key id `{kid}` and refresh failed"
-            )));
-        }
-
-        let key = self
-            .cached_key(&kid)?
-            .ok_or_else(|| AuthRejection::InvalidToken(format!("unknown jwks key id `{kid}`")))?;
+        // Do not force an immediate network refresh for untrusted kid values.
+        let key = self.cached_key(&kid)?.ok_or_else(|| {
+            AuthRejection::InvalidToken(format!(
+                "unknown jwks key id `{kid}` (will retry on next refresh interval)"
+            ))
+        })?;
 
         Ok((key, algorithm))
     }
 
     fn refresh_if_needed(&self) -> Result<(), AuthRejection> {
+        if !self.should_refresh()? {
+            return Ok(());
+        }
+
+        let _refresh_guard = self
+            .refresh_lock
+            .lock()
+            .map_err(|_| AuthRejection::Misconfigured("jwks refresh lock poisoned".to_string()))?;
+
+        // Double-check after obtaining refresh lock to prevent thundering herd refreshes.
         if !self.should_refresh()? {
             return Ok(());
         }
@@ -170,6 +183,23 @@ impl JwksProvider {
     }
 
     fn fetch_jwks(&self) -> Result<JwkSet, AuthRejection> {
+        self.run_blocking_fetch()
+    }
+
+    fn run_blocking_fetch(&self) -> Result<JwkSet, AuthRejection> {
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            if matches!(
+                handle.runtime_flavor(),
+                tokio::runtime::RuntimeFlavor::MultiThread
+            ) {
+                return tokio::task::block_in_place(|| self.fetch_jwks_blocking());
+            }
+        }
+
+        self.fetch_jwks_blocking()
+    }
+
+    fn fetch_jwks_blocking(&self) -> Result<JwkSet, AuthRejection> {
         let response = match self.client.get(&self.url).call() {
             Ok(response) => response,
             Err(ureq::Error::Status(status, _response)) => {
@@ -184,8 +214,22 @@ impl JwksProvider {
             }
         };
 
-        let raw = response.into_string().map_err(|err| {
+        let mut limited = response
+            .into_reader()
+            .take((MAX_JWKS_RESPONSE_BYTES + 1) as u64);
+        let mut bytes = Vec::new();
+        limited.read_to_end(&mut bytes).map_err(|err| {
             AuthRejection::Misconfigured(format!("failed to read jwks body: {err}"))
+        })?;
+
+        if bytes.len() > MAX_JWKS_RESPONSE_BYTES {
+            return Err(AuthRejection::Misconfigured(format!(
+                "jwks payload exceeds max size of {MAX_JWKS_RESPONSE_BYTES} bytes"
+            )));
+        }
+
+        let raw = String::from_utf8(bytes).map_err(|err| {
+            AuthRejection::Misconfigured(format!("jwks payload is not valid utf-8: {err}"))
         })?;
 
         serde_json::from_str::<JwkSet>(&raw)
@@ -531,7 +575,10 @@ mod tests {
     use std::{
         io::{Read, Write},
         net::TcpListener,
-        sync::{mpsc, LazyLock, Mutex},
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            mpsc, LazyLock, Mutex,
+        },
         thread,
     };
 
@@ -571,7 +618,7 @@ mod tests {
     #[test]
     fn jwks_mode_validates_rs256_token() {
         let jwks_body = build_jwks_json("rsa-key-1");
-        let (jwks_url, _payload, shutdown_tx) = spawn_jwks_server(jwks_body);
+        let (jwks_url, _payload, _request_count, shutdown_tx) = spawn_jwks_server(jwks_body);
 
         let cfg = AuthRuntimeConfig {
             enabled: true,
@@ -603,7 +650,7 @@ mod tests {
     #[test]
     fn jwks_refresh_failure_uses_cached_keys() {
         let jwks_body = build_jwks_json("rsa-key-1");
-        let (jwks_url, payload, shutdown_tx) = spawn_jwks_server(jwks_body);
+        let (jwks_url, payload, _request_count, shutdown_tx) = spawn_jwks_server(jwks_body);
 
         let provider = Arc::new(JwksProvider::new(
             jwks_url.clone(),
@@ -643,7 +690,7 @@ mod tests {
     #[test]
     fn jwks_rejects_unknown_kid() {
         let jwks_body = build_jwks_json("rsa-key-1");
-        let (jwks_url, _payload, shutdown_tx) = spawn_jwks_server(jwks_body);
+        let (jwks_url, _payload, _request_count, shutdown_tx) = spawn_jwks_server(jwks_body);
 
         let cfg = AuthRuntimeConfig {
             enabled: true,
@@ -671,6 +718,99 @@ mod tests {
             }
             other => panic!("unexpected error: {other:?}"),
         }
+
+        let _ = shutdown_tx.send(());
+    }
+
+    #[test]
+    fn jwks_unknown_kid_does_not_force_immediate_refresh() {
+        let jwks_body = build_jwks_json("rsa-key-1");
+        let (jwks_url, _payload, request_count, shutdown_tx) = spawn_jwks_server(jwks_body);
+
+        let cfg = AuthRuntimeConfig {
+            enabled: true,
+            jwt_secret: None,
+            jwks_url: Some(jwks_url.clone()),
+            jwks_refresh_secs: 300,
+            jwks_allowed_algorithms: default_jwks_algorithms(),
+            expected_issuer: Some("https://issuer.local".to_string()),
+            expected_audience: Some("openportio-api".to_string()),
+            jwks_provider: Some(Arc::new(JwksProvider::new(
+                jwks_url,
+                300,
+                default_jwks_algorithms(),
+            ))),
+        };
+
+        let known_token = build_rs256_token("rsa-key-1", "https://issuer.local", "openportio-api");
+        cfg.authenticate_authorization_value_str(&format!("Bearer {known_token}"))
+            .expect("known kid should validate");
+        let before_unknown = request_count.load(Ordering::SeqCst);
+
+        let unknown_token =
+            build_rs256_token("unknown-key", "https://issuer.local", "openportio-api");
+        let err = cfg
+            .authenticate_authorization_value_str(&format!("Bearer {unknown_token}"))
+            .expect_err("unknown kid must fail");
+        assert!(matches!(err, AuthRejection::InvalidToken(_)));
+
+        let after_unknown = request_count.load(Ordering::SeqCst);
+        assert_eq!(
+            before_unknown, after_unknown,
+            "unknown kid must not trigger an out-of-interval jwks refresh"
+        );
+
+        let _ = shutdown_tx.send(());
+    }
+
+    #[test]
+    fn jwks_concurrent_refresh_performs_single_fetch() {
+        let jwks_body = build_jwks_json("rsa-key-1");
+        let (jwks_url, _payload, request_count, shutdown_tx) = spawn_jwks_server(jwks_body);
+
+        let cfg = Arc::new(AuthRuntimeConfig {
+            enabled: true,
+            jwt_secret: None,
+            jwks_url: Some(jwks_url.clone()),
+            jwks_refresh_secs: 1,
+            jwks_allowed_algorithms: default_jwks_algorithms(),
+            expected_issuer: Some("https://issuer.local".to_string()),
+            expected_audience: Some("openportio-api".to_string()),
+            jwks_provider: Some(Arc::new(JwksProvider::new(
+                jwks_url,
+                1,
+                default_jwks_algorithms(),
+            ))),
+        });
+
+        let token = build_rs256_token("rsa-key-1", "https://issuer.local", "openportio-api");
+        let auth_header = format!("Bearer {token}");
+        cfg.authenticate_authorization_value_str(&auth_header)
+            .expect("initial call should warm cache");
+        let before = request_count.load(Ordering::SeqCst);
+
+        std::thread::sleep(Duration::from_millis(1_100));
+
+        let mut workers = Vec::new();
+        for _ in 0..8 {
+            let cfg = Arc::clone(&cfg);
+            let auth_header = auth_header.clone();
+            workers.push(thread::spawn(move || {
+                cfg.authenticate_authorization_value_str(&auth_header)
+                    .expect("concurrent auth call should succeed");
+            }));
+        }
+
+        for worker in workers {
+            worker.join().expect("worker thread should join");
+        }
+
+        let after = request_count.load(Ordering::SeqCst);
+        assert_eq!(
+            after,
+            before + 1,
+            "only one refresh fetch should occur per refresh interval under concurrency"
+        );
 
         let _ = shutdown_tx.send(());
     }
@@ -709,7 +849,8 @@ mod tests {
 
     #[test]
     fn jwks_malformed_payload_without_cache_returns_misconfigured() {
-        let (jwks_url, _payload, shutdown_tx) = spawn_jwks_server("{ invalid-json".to_string());
+        let (jwks_url, _payload, _request_count, shutdown_tx) =
+            spawn_jwks_server("{ invalid-json".to_string());
         let cfg = AuthRuntimeConfig {
             enabled: true,
             jwt_secret: None,
@@ -733,6 +874,43 @@ mod tests {
         match err {
             AuthRejection::Misconfigured(message) => {
                 assert!(message.contains("invalid jwks payload"));
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let _ = shutdown_tx.send(());
+    }
+
+    #[test]
+    fn jwks_rejects_oversized_payload() {
+        let oversized = "a".repeat(MAX_JWKS_RESPONSE_BYTES + 16);
+        let (jwks_url, _payload, _request_count, shutdown_tx) = spawn_jwks_server(oversized);
+        let cfg = AuthRuntimeConfig {
+            enabled: true,
+            jwt_secret: None,
+            jwks_url: Some(jwks_url.clone()),
+            jwks_refresh_secs: 300,
+            jwks_allowed_algorithms: default_jwks_algorithms(),
+            expected_issuer: Some("https://issuer.local".to_string()),
+            expected_audience: Some("openportio-api".to_string()),
+            jwks_provider: Some(Arc::new(JwksProvider::new(
+                jwks_url,
+                300,
+                default_jwks_algorithms(),
+            ))),
+        };
+
+        let token = build_rs256_token("rsa-key-1", "https://issuer.local", "openportio-api");
+        let err = cfg
+            .authenticate_authorization_value_str(&format!("Bearer {token}"))
+            .expect_err("oversized jwks payload should fail");
+
+        match err {
+            AuthRejection::Misconfigured(message) => {
+                assert!(
+                    message.contains("exceeds max size"),
+                    "expected size-limit error, got: {message}"
+                );
             }
             other => panic!("unexpected error: {other:?}"),
         }
@@ -764,7 +942,12 @@ mod tests {
 
     fn spawn_jwks_server(
         initial_payload: String,
-    ) -> (String, Arc<Mutex<String>>, mpsc::Sender<()>) {
+    ) -> (
+        String,
+        Arc<Mutex<String>>,
+        Arc<AtomicUsize>,
+        mpsc::Sender<()>,
+    ) {
         let listener = TcpListener::bind("127.0.0.1:0").expect("listener should bind");
         listener
             .set_nonblocking(true)
@@ -773,6 +956,8 @@ mod tests {
 
         let payload = Arc::new(Mutex::new(initial_payload));
         let payload_for_server = Arc::clone(&payload);
+        let request_count = Arc::new(AtomicUsize::new(0));
+        let request_count_for_server = Arc::clone(&request_count);
         let (shutdown_tx, shutdown_rx) = mpsc::channel::<()>();
 
         thread::spawn(move || loop {
@@ -782,6 +967,7 @@ mod tests {
 
             match listener.accept() {
                 Ok((mut stream, _)) => {
+                    request_count_for_server.fetch_add(1, Ordering::SeqCst);
                     let mut request_buffer = [0_u8; 1024];
                     let _ = stream.read(&mut request_buffer);
 
@@ -801,7 +987,12 @@ mod tests {
             }
         });
 
-        (format!("http://{addr}/jwks"), payload, shutdown_tx)
+        (
+            format!("http://{addr}/jwks"),
+            payload,
+            request_count,
+            shutdown_tx,
+        )
     }
 
     fn clear_auth_env() {
