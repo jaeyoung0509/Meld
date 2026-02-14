@@ -32,6 +32,9 @@ jobs:
       - name: Workspace tests
         run: cargo test --workspace
 
+      - name: Production example tests
+        run: cargo test -p production-api -- --nocapture
+
   rest-grpc-e2e:
     name: REST gRPC E2E
     runs-on: ubuntu-latest

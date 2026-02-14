@@ -5,6 +5,7 @@ This project uses focused CI jobs so failures are clearly scoped:
 1. `Core Build And Test`
 - `cargo check --workspace`
 - `cargo test --workspace`
+- `cargo test -p production-api -- --nocapture`
 
 2. `REST gRPC E2E`
 - `cargo test -p meld-server --test multiplexing -- --nocapture`
