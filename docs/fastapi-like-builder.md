@@ -29,11 +29,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 - `with_state(...)`: inject shared app state
 - `with_rest_router(...)`: replace default REST router
+- `merge_raw_router(...)`: merge a plain Axum router escape hatch
 - `with_grpc_service(...)`: add typed gRPC service
+- `configure_tonic(...)` / `configure_tonic_routes(...)`: transform tonic `Routes` before final merge
 - `without_grpc()`: run REST-only mode
 - `with_middleware_config(...)`: configure shared middleware
 - `with_middleware(...)`: add custom router-level middleware
 - `on_startup(...)` / `on_shutdown(...)`: attach lifecycle hooks
+
+## Raw Escape Hatches
+
+```rust
+use axum::{routing::get, Router};
+use tonic::service::Routes;
+use openportio_server::OpenportioServer;
+
+let app = OpenportioServer::new()
+    .merge_raw_router(
+        Router::new().route("/metrics", get(|| async { "metrics-ok" })),
+    )
+    .configure_tonic(|routes| {
+        let grpc_router = routes
+            .into_axum_router()
+            .route("/grpc-hook", get(|| async { "grpc-hook-ok" }));
+        Routes::from(grpc_router)
+    })
+    .build_app();
+```
+
+Ordering guarantees:
+- base REST router (`with_rest_router(...)` or default)
+- raw router merges in call order
+- gRPC routes
+- shared middleware + dependency overrides
+- final custom middleware chain (`with_middleware(...)`)
+
+Supported / unsupported interactions:
+- Supported: adding plain Axum routes (`/metrics`, `/internal/*`) through `merge_raw_router(...)`.
+- Supported: route-level gRPC router transformation through `configure_tonic(...)`.
+- Not supported: full `tonic::transport::Server` tuning via this hook (for example transport-level HTTP/2 socket options).
+- `configure_tonic(...)` is ignored when `without_grpc()` is set.
 
 ## DTO And Dependency Injection Pattern
 

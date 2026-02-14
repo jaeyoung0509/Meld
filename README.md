@@ -176,6 +176,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### Raw Axum/Tonic Escape Hatches
+
+```rust
+use axum::{routing::get, Router};
+use tonic::service::Routes;
+use openportio_server::OpenportioServer;
+
+OpenportioServer::new()
+    .merge_raw_router(
+        Router::new().route("/metrics", get(|| async { "metrics-ok" })),
+    )
+    .configure_tonic(|routes| {
+        let grpc_router = routes
+            .into_axum_router()
+            .route("/grpc-hook", get(|| async { "grpc-hook-ok" }));
+        Routes::from(grpc_router)
+    })
+    .run()
+    .await?;
+```
+
+Ordering guarantees:
+- base REST router is built first (`with_rest_router(...)` or default routes)
+- `merge_raw_router(...)` routers are merged in call order
+- gRPC routes are merged after REST/raw merges
+- shared middleware + dependency overrides are applied after merge composition
+
+Notes:
+- `configure_tonic(...)` is route-level customization over `tonic::service::Routes`; it is not a full `tonic::transport::Server` builder replacement.
+- If `without_grpc()` is set, `configure_tonic(...)` is a no-op.
+
 See:
 - `docs/fastapi-like-builder.md`
 - `docs/dx-scorecard.md`
