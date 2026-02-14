@@ -7,20 +7,28 @@ This project uses focused CI jobs so failures are clearly scoped:
 - `cargo test --workspace`
 - `cargo test -p production-api -- --nocapture`
 
-2. `REST gRPC E2E`
+2. `Nextest`
+- `cargo nextest run --workspace --all-targets`
+
+3. `Coverage`
+- `cargo llvm-cov --workspace --summary-only`
+- `cargo llvm-cov --workspace --lcov --output-path target/coverage/lcov.info`
+- uploads `coverage-report` artifact (summary + lcov)
+
+4. `REST gRPC E2E`
 - `cargo test -p meld-server --test multiplexing -- --nocapture`
 
-3. `Docs Contract Drift Check`
+5. `Docs Contract Drift Check`
 - `./scripts/check_contracts_bundle.sh`
 - `cargo test -p meld-server openapi_json_is_available -- --nocapture`
 
-4. `Security Audit`
+6. `Security Audit`
 - `cargo audit`
 
-5. `Production Preflight`
+7. `Production Preflight`
 - `./scripts/prod_preflight.sh` with secure-mode CI environment
 
-6. `Release Dry Run`
+8. `Release Dry Run`
 - `./scripts/release_dry_run.sh`
 
 ## Local Equivalent
@@ -32,3 +40,11 @@ Run:
 ```
 
 This runs the same command set as CI in a single local flow.
+
+For dedicated nextest + coverage quality gates, run:
+
+```bash
+./scripts/test_quality.sh
+```
+
+See `docs/testing-toolchain.md` for installation and outputs.

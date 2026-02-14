@@ -219,6 +219,14 @@ This runs:
 - OpenAPI route check
 - production preflight gate
 
+Extended testing quality gate (nextest + coverage):
+
+```bash
+./scripts/test_quality.sh
+```
+
+See `docs/testing-toolchain.md` for setup and coverage artifacts.
+
 ## Production Readiness Docs
 
 - `docs/production/deployment.md`

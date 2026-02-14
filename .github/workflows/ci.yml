@@ -35,6 +35,62 @@ jobs:
       - name: Production example tests
         run: cargo test -p production-api -- --nocapture
 
+  nextest:
+    name: Nextest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: Run nextest workspace suite
+        run: cargo nextest run --workspace --all-targets
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Add LLVM tools preview
+        run: rustup component add llvm-tools-preview
+
+      - name: Generate coverage artifacts
+        run: |
+          mkdir -p target/coverage
+          cargo llvm-cov --workspace --summary-only | tee target/coverage/summary.txt
+          cargo llvm-cov --workspace --lcov --output-path target/coverage/lcov.info
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            target/coverage/summary.txt
+            target/coverage/lcov.info
+
   rest-grpc-e2e:
     name: REST gRPC E2E
     runs-on: ubuntu-latest

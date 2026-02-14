@@ -40,3 +40,4 @@ utoipa-swagger-ui = { version = "8", features = ["axum"] }
 http = "1"
 validator = { version = "0.19", features = ["derive"] }
 pulldown-cmark = "0.13"
+proptest = "1"
