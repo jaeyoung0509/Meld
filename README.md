@@ -169,6 +169,9 @@ cd website
 npm run docs:build
 ```
 
+After merge to `develop` or `main`, GitHub Actions deploys the docs site to:
+- `https://jaeyoung0509.github.io/Openportio/`
+
 ## Repository Layout
 
 ```text

@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitepress';
 
+const base = process.env.VITEPRESS_BASE || '/';
+
 export default defineConfig({
+  base,
   title: 'Openportio',
   description: 'Single-port REST + gRPC server framework for Rust.',
   cleanUrls: true,
