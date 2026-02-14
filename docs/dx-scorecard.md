@@ -77,3 +77,26 @@ REST and gRPC now share one domain-error mapping policy:
 Result:
 - Safer external error surface
 - Better observability without leaking internals
+
+## 6) Composable DTO + Trait-First Escape Hatch
+
+Openportio now supports explicit DTO composition without the all-in-one macro:
+
+```rust
+#[derive(
+    openportio_server::serde::Deserialize,
+    openportio_server::OpenPortIOValidate,
+    openportio_server::OpenPortIOSchema
+)]
+struct CreateNoteBody {
+    #[validate(length(min = 2, max = 120))]
+    title: String,
+}
+```
+
+For advanced validation logic that cannot be expressed with `validator` attributes, DTOs can implement:
+- `openportio_server::api::RequestValidation`
+
+Result:
+- All-in-one convenience (`#[dto]`) remains intact
+- Advanced teams get trait-first control without abandoning Openportio extractors

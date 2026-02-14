@@ -63,6 +63,20 @@ impl ApiErrorResponse {
 
 pub type ApiError = (StatusCode, Json<ApiErrorResponse>);
 
+pub trait RequestValidation {
+    fn validate_request(&self, source: &'static str) -> Result<(), ApiError>;
+}
+
+impl<T> RequestValidation for T
+where
+    T: Validate,
+{
+    fn validate_request(&self, source: &'static str) -> Result<(), ApiError> {
+        self.validate()
+            .map_err(|err| validation_error_with_source(err, source))
+    }
+}
+
 pub fn validation_error(err: ValidationErrors) -> ApiError {
     validation_error_with_source(err, "request")
 }
@@ -155,7 +169,7 @@ pub struct ValidatedJson<T>(pub T);
 #[axum::async_trait]
 impl<T, S> FromRequest<S> for ValidatedJson<T>
 where
-    T: DeserializeOwned + Validate,
+    T: DeserializeOwned + RequestValidation,
     S: Send + Sync,
 {
     type Rejection = ApiError;
@@ -165,9 +179,7 @@ where
             .await
             .map_err(|err| bad_request(format!("invalid json body: {err}")))?;
 
-        value
-            .validate()
-            .map_err(|err| validation_error_with_source(err, "body"))?;
+        value.validate_request("body")?;
         Ok(Self(value))
     }
 }
@@ -178,7 +190,7 @@ pub struct ValidatedQuery<T>(pub T);
 #[axum::async_trait]
 impl<T, S> FromRequestParts<S> for ValidatedQuery<T>
 where
-    T: DeserializeOwned + Validate,
+    T: DeserializeOwned + RequestValidation,
     S: Send + Sync,
 {
     type Rejection = ApiError;
@@ -187,9 +199,7 @@ where
         let Query(value) = Query::<T>::from_request_parts(parts, state)
             .await
             .map_err(|err| bad_request(format!("invalid query: {err}")))?;
-        value
-            .validate()
-            .map_err(|err| validation_error_with_source(err, "query"))?;
+        value.validate_request("query")?;
         Ok(Self(value))
     }
 }
@@ -200,7 +210,7 @@ pub struct ValidatedPath<T>(pub T);
 #[axum::async_trait]
 impl<T, S> FromRequestParts<S> for ValidatedPath<T>
 where
-    T: DeserializeOwned + Validate + Send,
+    T: DeserializeOwned + RequestValidation + Send,
     S: Send + Sync,
 {
     type Rejection = ApiError;
@@ -209,9 +219,7 @@ where
         let Path(value) = Path::<T>::from_request_parts(parts, state)
             .await
             .map_err(|err| bad_request(format!("invalid path: {err}")))?;
-        value
-            .validate()
-            .map_err(|err| validation_error_with_source(err, "path"))?;
+        value.validate_request("path")?;
         Ok(Self(value))
     }
 }
@@ -222,7 +230,7 @@ pub struct ValidatedParts<T>(pub T);
 #[axum::async_trait]
 impl<T, S> FromRequestParts<S> for ValidatedParts<T>
 where
-    T: FromRequestParts<S> + Validate,
+    T: FromRequestParts<S> + RequestValidation,
     T::Rejection: std::fmt::Display,
     S: Send + Sync,
 {
@@ -232,9 +240,7 @@ where
         let value = T::from_request_parts(parts, state)
             .await
             .map_err(|err| bad_request(format!("invalid request parts: {err}")))?;
-        value
-            .validate()
-            .map_err(|err| validation_error_with_source(err, "parts"))?;
+        value.validate_request("parts")?;
         Ok(Self(value))
     }
 }
@@ -248,6 +254,13 @@ impl IntoResponse for ApiErrorResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::{
+        body::{to_bytes, Body},
+        http::Request,
+        routing::post,
+        Router,
+    };
+    use tower::util::ServiceExt;
     use validator::Validate;
 
     #[derive(Debug, serde::Deserialize, Validate)]
@@ -287,5 +300,105 @@ mod tests {
         let status = map_domain_error_to_grpc(OpenportioError::Internal("db exploded".to_string()));
         assert_eq!(status.code(), tonic::Code::Internal);
         assert_eq!(status.message(), "internal server error");
+    }
+
+    #[derive(Debug, serde::Deserialize, Validate)]
+    struct DerivedValidationDto {
+        #[validate(length(min = 3))]
+        name: String,
+    }
+
+    #[derive(Debug, serde::Deserialize)]
+    struct TraitFirstDto {
+        name: String,
+    }
+
+    impl RequestValidation for TraitFirstDto {
+        fn validate_request(&self, source: &'static str) -> Result<(), ApiError> {
+            if self.name.starts_with("admin") {
+                let issue = ApiValidationIssue {
+                    loc: vec![source.to_string(), "name".to_string()],
+                    msg: "admin-prefixed names are reserved".to_string(),
+                    issue_type: "custom_validation".to_string(),
+                };
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(ApiErrorResponse::validation(
+                        "request validation failed",
+                        Some(vec![issue]),
+                        None,
+                    )),
+                ));
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn request_validation_trait_matches_validator_flow_for_common_case() {
+        let derived = DerivedValidationDto {
+            name: "ab".to_string(),
+        };
+        let (derived_status, Json(derived_body)) = derived
+            .validate_request("body")
+            .expect_err("validator-backed dto must fail");
+        assert_eq!(derived_status, StatusCode::BAD_REQUEST);
+        assert_eq!(derived_body.code, "validation_error");
+
+        let trait_first = TraitFirstDto {
+            name: "admin-test".to_string(),
+        };
+        let (trait_status, Json(trait_body)) = trait_first
+            .validate_request("body")
+            .expect_err("trait-first dto must fail");
+        assert_eq!(trait_status, StatusCode::BAD_REQUEST);
+        assert_eq!(trait_body.code, "validation_error");
+        let detail = trait_body.detail.expect("detail should exist");
+        assert!(detail
+            .iter()
+            .any(|issue| issue.issue_type == "custom_validation"));
+    }
+
+    async fn trait_first_handler(
+        ValidatedJson(body): ValidatedJson<TraitFirstDto>,
+    ) -> Result<Json<String>, ApiError> {
+        Ok(Json(body.name))
+    }
+
+    #[tokio::test]
+    async fn validated_json_accepts_trait_first_request_validation() {
+        let app = Router::new().route("/trait-first", post(trait_first_handler));
+
+        let ok_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/trait-first")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"name":"rustacean"}"#))
+                    .expect("request should build"),
+            )
+            .await
+            .expect("request should complete");
+        assert_eq!(ok_response.status(), StatusCode::OK);
+
+        let bad_response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/trait-first")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"name":"admin-root"}"#))
+                    .expect("request should build"),
+            )
+            .await
+            .expect("request should complete");
+        assert_eq!(bad_response.status(), StatusCode::BAD_REQUEST);
+        let body = to_bytes(bad_response.into_body(), usize::MAX)
+            .await
+            .expect("body bytes");
+        let parsed: ApiErrorResponse = serde_json::from_slice(&body).expect("api error json");
+        assert_eq!(parsed.code, "validation_error");
     }
 }

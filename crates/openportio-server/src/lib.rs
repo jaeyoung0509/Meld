@@ -49,13 +49,20 @@ pub use builder::OpenportioServer;
 pub use openportio_macros::{dto, route};
 pub use serde;
 pub use utoipa;
+pub use utoipa::ToSchema as MeldSchema;
+pub use utoipa::ToSchema as OpenPortIOSchema;
+pub use utoipa::ToSchema as OpenportioSchema;
 pub use validator;
+pub use validator::Validate as MeldValidate;
+pub use validator::Validate as OpenPortIOValidate;
+pub use validator::Validate as OpenportioValidate;
 pub type MeldServer = OpenportioServer;
 pub type AlloyServer = OpenportioServer;
 
 pub mod prelude {
     pub use crate::api::{
-        ApiError, ApiErrorResponse, ValidatedJson, ValidatedParts, ValidatedPath, ValidatedQuery,
+        ApiError, ApiErrorResponse, RequestValidation, ValidatedJson, ValidatedParts,
+        ValidatedPath, ValidatedQuery,
     };
     pub use crate::di::{
         with_dependency, with_dependency_override, with_dependency_overrides, DependencyOverrides,
@@ -64,7 +71,10 @@ pub mod prelude {
     pub use crate::AlloyServer;
     pub use crate::MeldServer;
     pub use crate::OpenportioServer;
-    pub use crate::{dto, route};
+    pub use crate::{
+        dto, route, MeldSchema, MeldValidate, OpenPortIOSchema, OpenPortIOValidate,
+        OpenportioSchema, OpenportioValidate,
+    };
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]

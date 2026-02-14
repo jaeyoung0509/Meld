@@ -26,9 +26,14 @@ Openportio is a Rust server framework focused on **FastAPI-like developer ergono
   - `/protected/whoami`
 - Fluent server builder API:
   - `OpenportioServer::new().with_...().run()`
-- Single-attribute DTO macro:
+- Single-attribute DTO macro (backward-compatible):
   - `#[openportio_server::dto]` for `Deserialize + Validate + ToSchema`
   - keep `utoipa` in your crate dependencies for schema derive expansion
+- Composable derive aliases:
+  - `OpenPortIOValidate` / `OpenPortIOSchema`
+  - legacy-compatible aliases: `MeldValidate` / `MeldSchema`
+- Trait-first validation escape hatch:
+  - implement `openportio_server::api::RequestValidation` for advanced custom checks
 - Depends-style DI extractor with request cache:
   - `openportio_server::di::Depends<T>`
 - Shared middleware stack:
@@ -173,6 +178,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .run()
         .await?;
     Ok(())
+}
+```
+
+### DTO Modes: All-In-One, Composable, Trait-First
+
+All-in-one (existing behavior):
+
+```rust
+#[openportio_server::dto]
+struct CreateNoteBody {
+    #[validate(length(min = 2, max = 120))]
+    title: String,
+}
+```
+
+Composable derives (choose pieces explicitly):
+
+```rust
+#[derive(
+    openportio_server::serde::Deserialize,
+    openportio_server::OpenPortIOValidate,
+    openportio_server::OpenPortIOSchema
+)]
+struct CreateNoteBody {
+    #[validate(length(min = 2, max = 120))]
+    title: String,
+}
+```
+
+Trait-first escape hatch (custom validation logic):
+
+```rust
+use axum::{Json, http::StatusCode};
+use openportio_server::api::{ApiError, ApiErrorResponse, ApiValidationIssue, RequestValidation};
+
+#[derive(openportio_server::serde::Deserialize)]
+struct CreateNoteBody {
+    title: String,
+}
+
+impl RequestValidation for CreateNoteBody {
+    fn validate_request(&self, source: &'static str) -> Result<(), ApiError> {
+        if self.title.starts_with("admin") {
+            let issue = ApiValidationIssue {
+                loc: vec![source.to_string(), "title".to_string()],
+                msg: "admin-prefixed titles are reserved".to_string(),
+                issue_type: "custom_validation".to_string(),
+            };
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ApiErrorResponse::validation(
+                    "request validation failed",
+                    Some(vec![issue]),
+                    None,
+                )),
+            ));
+        }
+        Ok(())
+    }
 }
 ```
 

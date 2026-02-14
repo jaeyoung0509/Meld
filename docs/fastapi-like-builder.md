@@ -22,7 +22,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 `openportio_server::prelude::*` includes:
 - `OpenportioServer`
 - `route` and `dto` macros
+- composable derive aliases:
+  - `OpenPortIOValidate` / `OpenPortIOSchema`
+  - `MeldValidate` / `MeldSchema` (compatibility aliases)
 - common validation extractors (`ValidatedJson`, `ValidatedQuery`, `ValidatedPath`, `ValidatedParts`)
+- trait-first validation contract: `RequestValidation`
 - `Depends` DI extractor
 
 ## Common Customization Points
@@ -72,11 +76,14 @@ Supported / unsupported interactions:
 
 ## DTO And Dependency Injection Pattern
 
-You can model FastAPI-like DTOs with `#[openportio_server::dto]` and inject shared dependencies using `State<Arc<AppState>>`.
+Openportio supports three DTO styles:
+- all-in-one `#[openportio_server::dto]`
+- composable derives (`OpenPortIOValidate` / `OpenPortIOSchema`)
+- trait-first validation via `RequestValidation`
 
-`dto` requirements:
-- `utoipa` must be available in the crate dependencies (for `ToSchema` derive expansion)
-- `validator` field attributes (such as `#[validate(...)]`) are supported directly
+Requirements:
+- `utoipa` must be available in crate dependencies (for schema derive expansion)
+- `validator` field attributes (such as `#[validate(...)]`) are supported directly for macro/derive-based validation
 
 ```rust
 use std::sync::Arc;
@@ -104,6 +111,16 @@ struct CreateNoteBody {
     title: String,
 }
 
+#[derive(
+    openportio_server::serde::Deserialize,
+    openportio_server::OpenPortIOValidate,
+    openportio_server::OpenPortIOSchema
+)]
+struct ComposableCreateNoteBody {
+    #[validate(length(min = 2, max = 120))]
+    title: String,
+}
+
 #[derive(Serialize)]
 struct NoteResponse {
     id: String,
@@ -119,7 +136,47 @@ async fn get_note(
 }
 ```
 
-See `/examples/simple-server/src/main.rs` for a runnable end-to-end example using these DTO styles.
+Trait-first validation example:
+
+```rust
+use axum::{Json, http::StatusCode};
+use openportio_server::api::{
+    ApiError, ApiErrorResponse, ApiValidationIssue, RequestValidation,
+};
+
+#[derive(openportio_server::serde::Deserialize)]
+struct TraitFirstBody {
+    title: String,
+}
+
+impl RequestValidation for TraitFirstBody {
+    fn validate_request(&self, source: &'static str) -> Result<(), ApiError> {
+        if self.title.starts_with("admin") {
+            let issue = ApiValidationIssue {
+                loc: vec![source.to_string(), "title".to_string()],
+                msg: "admin-prefixed titles are reserved".to_string(),
+                issue_type: "custom_validation".to_string(),
+            };
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ApiErrorResponse::validation(
+                    "request validation failed",
+                    Some(vec![issue]),
+                    None,
+                )),
+            ));
+        }
+        Ok(())
+    }
+}
+```
+
+Migration guidance:
+- keep `#[dto]` when you want the shortest path
+- switch to composable derives when you need explicit per-derive control
+- use trait-first `RequestValidation` when validator derive cannot express your logic
+
+See `/examples/simple-server/src/main.rs` for runnable end-to-end handler patterns.
 
 ## Validation And Error DTO Pattern
 
