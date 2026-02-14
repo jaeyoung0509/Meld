@@ -207,6 +207,22 @@ Notes:
 - `configure_tonic(...)` is route-level customization over `tonic::service::Routes`; it is not a full `tonic::transport::Server` builder replacement.
 - If `without_grpc()` is set, `configure_tonic(...)` is a no-op.
 
+### Dual-Port Mode
+
+Single-port remains the default, but you can split listeners explicitly:
+
+```rust
+use openportio_server::OpenportioServer;
+
+OpenportioServer::new()
+    .with_rest_addr(([0, 0, 0, 0], 3000).into())
+    .with_grpc_addr(([0, 0, 0, 0], 50051).into())
+    .run()
+    .await?;
+```
+
+Use this when infrastructure policy requires explicit REST/gRPC port separation.
+
 See:
 - `docs/fastapi-like-builder.md`
 - `docs/dx-scorecard.md`

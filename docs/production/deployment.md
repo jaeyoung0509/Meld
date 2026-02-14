@@ -33,6 +33,33 @@ OPENPORTIO_CORS_ALLOW_ORIGINS=https://app.example.com \
 cargo run -p openportio-server
 ```
 
+## Single-Port vs Dual-Port Deployment
+
+Single-port (default) runs REST + gRPC on one listener:
+- simpler ingress and fewer exposed ports
+- good default for most teams
+
+Dual-port mode splits REST and gRPC listeners:
+- useful when your platform/load-balancer expects separate protocol ports
+- enables independent traffic policy and SLO management per protocol
+
+Programmatic dual-port example:
+
+```rust
+use openportio_server::OpenportioServer;
+
+OpenportioServer::new()
+    .with_rest_addr(([0, 0, 0, 0], 3000).into())
+    .with_grpc_addr(([0, 0, 0, 0], 50051).into())
+    .run()
+    .await?;
+```
+
+Migration guidance:
+- start from your existing single-port config
+- introduce a dedicated gRPC port and route gRPC traffic there first
+- keep REST on current port, validate probes/alerts, then remove single-port assumptions from infrastructure
+
 ## Preflight Gate (Recommended Before Rollout)
 
 ```bash

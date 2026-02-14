@@ -7,7 +7,7 @@ use openportio_core::AppState;
 use openportio_rpc::{GreeterClient, HelloRequest};
 use openportio_server::{
     auth::AuthRuntimeConfig, build_multiplexed_router, build_multiplexed_router_with_auth,
-    middleware,
+    middleware, OpenportioServer,
 };
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -283,4 +283,79 @@ async fn grpc_auth_interceptor_rejects_missing_token_and_accepts_valid_token() {
 
     let _ = shutdown_tx.send(());
     let _ = server.await;
+}
+
+async fn reserve_local_addr() -> std::net::SocketAddr {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind ephemeral listener");
+    let addr = listener.local_addr().expect("ephemeral local addr");
+    drop(listener);
+    addr
+}
+
+#[tokio::test]
+async fn serves_rest_and_grpc_on_explicit_dual_ports() {
+    let rest_addr = reserve_local_addr().await;
+    let grpc_addr = reserve_local_addr().await;
+    let local = tokio::task::LocalSet::new();
+
+    local
+        .run_until(async move {
+            let server = tokio::task::spawn_local(async move {
+                OpenportioServer::new()
+                    .with_state(Arc::new(AppState::local("dual-port-test")))
+                    .with_rest_addr(rest_addr)
+                    .with_grpc_addr(grpc_addr)
+                    .run()
+                    .await
+                    .expect("dual-port server should run");
+            });
+
+            let rest_base_url = format!("http://{rest_addr}");
+            let grpc_base_url = format!("http://{grpc_addr}");
+            let rest_client = reqwest::Client::builder()
+                .build()
+                .expect("build reqwest client");
+
+            let health_status = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                loop {
+                    match rest_client
+                        .get(format!("{rest_base_url}/health"))
+                        .send()
+                        .await
+                    {
+                        Ok(resp) => break resp.status(),
+                        Err(_) => tokio::time::sleep(std::time::Duration::from_millis(50)).await,
+                    }
+                }
+            })
+            .await
+            .expect("rest listener should become healthy in time");
+            assert_eq!(health_status.as_u16(), 200);
+
+            let mut grpc_client = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                loop {
+                    match GreeterClient::connect(grpc_base_url.clone()).await {
+                        Ok(client) => break client,
+                        Err(_) => tokio::time::sleep(std::time::Duration::from_millis(50)).await,
+                    }
+                }
+            })
+            .await
+            .expect("grpc listener should become reachable in time");
+
+            let grpc_response = grpc_client
+                .say_hello(tonic::Request::new(HelloRequest {
+                    name: "DualPort".to_string(),
+                }))
+                .await
+                .expect("grpc call should succeed on grpc listener")
+                .into_inner();
+            assert_eq!(grpc_response.message, "Hello, DualPort!");
+
+            server.abort();
+            let _ = server.await;
+        })
+        .await;
 }

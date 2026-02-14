@@ -301,6 +301,32 @@ Test override helper:
 - Default `OpenportioServer::new()` enables both REST and gRPC on a single listener.
 - Default address uses `OPENPORTIO_SERVER_ADDR` if set, otherwise `127.0.0.1:3000`.
 
+## Single-Port vs Dual-Port
+
+Default mode is single-port multiplexing:
+
+```rust
+OpenportioServer::new()
+    .with_addr(([0, 0, 0, 0], 3000).into())
+    .run()
+    .await?;
+```
+
+Explicit dual-port mode:
+
+```rust
+OpenportioServer::new()
+    .with_rest_addr(([0, 0, 0, 0], 3000).into())
+    .with_grpc_addr(([0, 0, 0, 0], 50051).into())
+    .run()
+    .await?;
+```
+
+Operational guidance:
+- Keep single-port for local development and simple edge deployments.
+- Use dual-port when platform networking prefers explicit protocol separation (for example dedicated gRPC service ports, strict L4/L7 rules, or separate SLO tracking).
+- Dual-port config is all-or-nothing: both `with_rest_addr(...)` and `with_grpc_addr(...)` must be provided.
+
 ## gRPC Quickstart (No-Auth + Auth)
 
 Prerequisites:

@@ -1,9 +1,10 @@
-use std::{convert::Infallible, env, net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, env, future::IntoFuture, io, net::SocketAddr, sync::Arc};
 
 use axum::Router;
 use http::{Request, Response};
 use openportio_core::AppState;
 use tokio::net::TcpListener;
+use tokio::sync::watch;
 use tonic::{body::BoxBody, server::NamedService, service::Routes};
 use tower::Service;
 
@@ -16,6 +17,8 @@ type ShutdownHook = Box<dyn Fn() + Send + Sync + 'static>;
 pub struct OpenportioServer {
     state: Arc<AppState>,
     addr: SocketAddr,
+    rest_addr: Option<SocketAddr>,
+    grpc_addr: Option<SocketAddr>,
     rest_router: Option<Router>,
     raw_routers: Vec<Router>,
     grpc_routes: Option<Routes>,
@@ -33,6 +36,8 @@ impl OpenportioServer {
             grpc_routes: Some(grpc::build_grpc_routes(state.clone())),
             state,
             addr: load_addr_from_env().unwrap_or(SocketAddr::from(([127, 0, 0, 1], 3000))),
+            rest_addr: None,
+            grpc_addr: None,
             rest_router: None,
             raw_routers: Vec::new(),
             dependency_overrides: di::DependencyOverrides::default(),
@@ -45,6 +50,18 @@ impl OpenportioServer {
 
     pub fn with_addr(mut self, addr: SocketAddr) -> Self {
         self.addr = addr;
+        self.rest_addr = None;
+        self.grpc_addr = None;
+        self
+    }
+
+    pub fn with_rest_addr(mut self, addr: SocketAddr) -> Self {
+        self.rest_addr = Some(addr);
+        self
+    }
+
+    pub fn with_grpc_addr(mut self, addr: SocketAddr) -> Self {
+        self.grpc_addr = Some(addr);
         self
     }
 
@@ -146,28 +163,60 @@ impl OpenportioServer {
     }
 
     pub fn build_app(&self) -> Router {
+        let merged = match self.build_grpc_router() {
+            Some(grpc_router) => self.build_rest_router().merge(grpc_router),
+            None => self.build_rest_router(),
+        };
+        self.finalize_router(merged)
+    }
+
+    pub async fn run(self) -> Result<(), Box<dyn std::error::Error>> {
+        match self.dual_port_addrs()? {
+            Some((rest_addr, grpc_addr)) => self.run_dual_port(rest_addr, grpc_addr).await,
+            None => self.run_single_port().await,
+        }
+    }
+
+    fn build_rest_router(&self) -> Router {
         let rest = self
             .rest_router
             .clone()
             .unwrap_or_else(|| build_router(self.state.clone()));
-        let rest = self
-            .raw_routers
+        self.raw_routers
             .iter()
             .cloned()
-            .fold(rest, |acc, router| acc.merge(router));
-        let merged = match &self.grpc_routes {
-            Some(routes) => rest.merge(routes.clone().into_axum_router()),
-            None => rest,
-        };
+            .fold(rest, |acc, router| acc.merge(router))
+    }
 
-        let app = middleware::apply_shared_middleware(merged, &self.middleware_config);
+    fn build_grpc_router(&self) -> Option<Router> {
+        self.grpc_routes
+            .clone()
+            .map(|routes| routes.into_axum_router())
+    }
+
+    fn finalize_router(&self, router: Router) -> Router {
+        let app = middleware::apply_shared_middleware(router, &self.middleware_config);
         let app = di::with_dependency_overrides(app, self.dependency_overrides.clone());
         self.middleware_customizers
             .iter()
             .fold(app, |acc, customizer| customizer(acc))
     }
 
-    pub async fn run(self) -> Result<(), Box<dyn std::error::Error>> {
+    fn dual_port_addrs(
+        &self,
+    ) -> Result<Option<(SocketAddr, SocketAddr)>, Box<dyn std::error::Error>> {
+        match (self.rest_addr, self.grpc_addr) {
+            (None, None) => Ok(None),
+            (Some(rest), Some(grpc)) => Ok(Some((rest, grpc))),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "dual-port mode requires both with_rest_addr(...) and with_grpc_addr(...)",
+            )
+            .into()),
+        }
+    }
+
+    async fn run_single_port(self) -> Result<(), Box<dyn std::error::Error>> {
         let app = self.build_app();
         let listener = TcpListener::bind(self.addr).await?;
 
@@ -185,6 +234,74 @@ impl OpenportioServer {
                 }
             })
             .await?;
+        Ok(())
+    }
+
+    async fn run_dual_port(
+        self,
+        rest_addr: SocketAddr,
+        grpc_addr: SocketAddr,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let grpc_router = self.build_grpc_router().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "dual-port mode requires gRPC routes; do not combine with without_grpc()",
+            )
+        })?;
+        let rest_app = self.finalize_router(self.build_rest_router());
+        let grpc_app = self.finalize_router(grpc_router);
+
+        let rest_listener = TcpListener::bind(rest_addr).await?;
+        let grpc_listener = TcpListener::bind(grpc_addr).await?;
+
+        for hook in &self.startup_hooks {
+            hook(rest_addr);
+        }
+        for hook in &self.startup_hooks {
+            hook(grpc_addr);
+        }
+        tracing::info!(addr = %rest_addr, mode = "dual-port", protocol = "rest", "openportio-server listening");
+        tracing::info!(addr = %grpc_addr, mode = "dual-port", protocol = "grpc", "openportio-server listening");
+
+        let (shutdown_tx, _) = watch::channel(false);
+        let mut rest_shutdown = shutdown_tx.subscribe();
+        let mut grpc_shutdown = shutdown_tx.subscribe();
+
+        let rest_server = axum::serve(rest_listener, rest_app)
+            .with_graceful_shutdown(async move {
+                let _ = rest_shutdown.changed().await;
+            })
+            .into_future();
+        let grpc_server = axum::serve(grpc_listener, grpc_app)
+            .with_graceful_shutdown(async move {
+                let _ = grpc_shutdown.changed().await;
+            })
+            .into_future();
+
+        tokio::pin!(rest_server);
+        tokio::pin!(grpc_server);
+
+        let first_exit = tokio::select! {
+            _ = tokio::signal::ctrl_c() => None,
+            result = &mut rest_server => Some(("rest", result)),
+            result = &mut grpc_server => Some(("grpc", result)),
+        };
+
+        let _ = shutdown_tx.send(true);
+
+        let (rest_result, grpc_result) = match first_exit {
+            Some(("rest", result)) => (result, grpc_server.await),
+            Some(("grpc", result)) => (rest_server.await, result),
+            None => (rest_server.await, grpc_server.await),
+            Some((_other, _result)) => unreachable!("only rest/grpc branches are possible"),
+        };
+
+        for hook in &self.shutdown_hooks {
+            hook();
+        }
+
+        rest_result?;
+        grpc_result?;
         Ok(())
     }
 }
@@ -395,5 +512,16 @@ mod tests {
         ] {
             env::remove_var(key);
         }
+    }
+
+    #[test]
+    fn dual_port_requires_both_addresses() {
+        let err = OpenportioServer::new()
+            .with_rest_addr(SocketAddr::from(([127, 0, 0, 1], 4100)))
+            .dual_port_addrs()
+            .expect_err("single dual-port addr should fail");
+        assert!(err
+            .to_string()
+            .contains("requires both with_rest_addr(...) and with_grpc_addr(...)"));
     }
 }
