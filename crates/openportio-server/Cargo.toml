@@ -1,0 +1,40 @@
+[package]
+name = "openportio-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Single-port REST + gRPC server framework with FastAPI-like DX for Rust."
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/openportio-server"
+readme = "README.md"
+keywords = ["openportio", "axum", "tonic", "rest", "grpc"]
+categories = ["web-programming", "network-programming", "asynchronous"]
+
+[dependencies]
+openportio-core = { path = "../openportio-core", version = "0.1.0" }
+openportio-macros = { path = "../openportio-macros", version = "0.1.0" }
+openportio-rpc = { path = "../openportio-rpc", version = "0.1.0" }
+axum.workspace = true
+futures-util.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+tonic-reflection.workspace = true
+tower.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tower-http.workspace = true
+utoipa.workspace = true
+utoipa-swagger-ui.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+http.workspace = true
+validator.workspace = true
+pulldown-cmark.workspace = true
+
+[dev-dependencies]
+jsonwebtoken.workspace = true
+reqwest.workspace = true
+tokio-tungstenite.workspace = true
+proptest.workspace = true

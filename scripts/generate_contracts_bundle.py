@@ -135,7 +135,7 @@ def collect_grpc_methods(grpc_openapi: dict, errors: list[str]) -> list[dict]:
             .get("$ref")
         )
 
-        metadata = post.get("x-meld-grpc")
+        metadata = post.get("x-openportio-grpc")
         if isinstance(metadata, dict):
             package = metadata.get("package")
             service = metadata.get("service")
@@ -148,7 +148,7 @@ def collect_grpc_methods(grpc_openapi: dict, errors: list[str]) -> list[dict]:
                 from_metadata = f"{package}.{service}/{method}"
                 if from_metadata != grpc_method:
                     errors.append(
-                        "gRPC bridge method mismatch between path and x-meld-grpc metadata: "
+                        "gRPC bridge method mismatch between path and x-openportio-grpc metadata: "
                         f"path={grpc_method}, metadata={from_metadata}"
                     )
 

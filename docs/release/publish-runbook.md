@@ -1,13 +1,17 @@
 # crates.io Publish Runbook
 
-This runbook documents the reproducible release flow for Meld crates.
+This runbook documents the reproducible release flow for Openportio crates.
+
+Rename context:
+- Project name changed from `Meld` to `Openportio`.
+- Runtime `MELD_*` env keys remain as compatibility aliases, but all docs/scripts/defaults use `OPENPORTIO_*`.
 
 ## Publish Targets
 
-- `meld-core`
-- `meld-macros`
-- `meld-rpc`
-- `meld-server`
+- `openportio-core`
+- `openportio-macros`
+- `openportio-rpc`
+- `openportio-server`
 
 Examples are intentionally non-publishable (`publish = false`).
 
@@ -26,10 +30,10 @@ cargo test --workspace
 
 `scripts/release_dry_run.sh` does:
 - `cargo publish --dry-run` for all publishable crates:
-  - `meld-core`
-  - `meld-macros`
-  - `meld-rpc`
-  - `meld-server`
+  - `openportio-core`
+  - `openportio-macros`
+  - `openportio-rpc`
+  - `openportio-server`
 - applies local `patch.crates-io` overrides so dry-run can validate dependent crates
   before first crates.io index propagation.
 
@@ -37,18 +41,18 @@ cargo test --workspace
 
 Use this order to respect dependency graph:
 
-1. `meld-core`
-2. `meld-macros`
-3. `meld-rpc`
-4. `meld-server`
+1. `openportio-core`
+2. `openportio-macros`
+3. `openportio-rpc`
+4. `openportio-server`
 
 Publish commands:
 
 ```bash
-cargo publish -p meld-core
-cargo publish -p meld-macros
-cargo publish -p meld-rpc
-cargo publish -p meld-server
+cargo publish -p openportio-core
+cargo publish -p openportio-macros
+cargo publish -p openportio-rpc
+cargo publish -p openportio-server
 ```
 
 ## Automated GitHub Release Path (Recommended)
@@ -74,7 +78,7 @@ git push origin v0.1.0
 
 3. GitHub Actions will:
 - re-run release quality gates
-- publish crates in dependency order (`meld-core` -> `meld-macros` -> `meld-rpc` -> `meld-server`)
+- publish crates in dependency order (`openportio-core` -> `openportio-macros` -> `openportio-rpc` -> `openportio-server`)
 - create/update GitHub release notes
 
 The workflow rejects tags that are not reachable from `main`.

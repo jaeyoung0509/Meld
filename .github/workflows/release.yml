@@ -1,4 +1,4 @@
-name: Meld Release
+name: Openportio Release
 
 on:
   push:
@@ -45,18 +45,18 @@ jobs:
           cargo clippy --workspace --all-targets -- -D warnings
           cargo test --workspace
           ./scripts/check_contracts_bundle.sh
-          MELD_PREFLIGHT_SECURE=true \
-          MELD_PREFLIGHT_BOOT_SERVER=true \
-          MELD_PREFLIGHT_WAIT_SECONDS=120 \
-          MELD_PREFLIGHT_BASE_URL=http://127.0.0.1:3000 \
-          MELD_AUTH_ENABLED=true \
-          MELD_AUTH_JWT_SECRET=ci-release-secret \
-          MELD_AUTH_ISSUER=https://issuer.local \
-          MELD_AUTH_AUDIENCE=meld-api \
-          MELD_CORS_ALLOW_ORIGINS=https://app.example.com \
-          MELD_TIMEOUT_SECONDS=15 \
-          MELD_REQUEST_BODY_LIMIT_BYTES=1048576 \
-          MELD_MAX_IN_FLIGHT_REQUESTS=1024 \
+          OPENPORTIO_PREFLIGHT_SECURE=true \
+          OPENPORTIO_PREFLIGHT_BOOT_SERVER=true \
+          OPENPORTIO_PREFLIGHT_WAIT_SECONDS=120 \
+          OPENPORTIO_PREFLIGHT_BASE_URL=http://127.0.0.1:3000 \
+          OPENPORTIO_AUTH_ENABLED=true \
+          OPENPORTIO_AUTH_JWT_SECRET=ci-release-secret \
+          OPENPORTIO_AUTH_ISSUER=https://issuer.local \
+          OPENPORTIO_AUTH_AUDIENCE=openportio-api \
+          OPENPORTIO_CORS_ALLOW_ORIGINS=https://app.example.com \
+          OPENPORTIO_TIMEOUT_SECONDS=15 \
+          OPENPORTIO_REQUEST_BODY_LIMIT_BYTES=1048576 \
+          OPENPORTIO_MAX_IN_FLIGHT_REQUESTS=1024 \
           ./scripts/prod_preflight.sh
           ./scripts/release_dry_run.sh
 
@@ -108,10 +108,10 @@ jobs:
             done
           }
 
-          publish_with_retry meld-core
-          publish_with_retry meld-macros
-          publish_with_retry meld-rpc
-          publish_with_retry meld-server
+          publish_with_retry openportio-core
+          publish_with_retry openportio-macros
+          publish_with_retry openportio-rpc
+          publish_with_retry openportio-server
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2

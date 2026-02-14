@@ -1,0 +1,17 @@
+[package]
+name = "openportio-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core domain types, state, and error model for the Openportio framework."
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/openportio-core"
+readme = "README.md"
+keywords = ["openportio", "framework", "rest", "grpc", "rust"]
+categories = ["web-programming", "network-programming", "asynchronous"]
+
+[dependencies]
+jsonwebtoken.workspace = true
+serde.workspace = true
+thiserror.workspace = true

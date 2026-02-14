@@ -1,25 +1,25 @@
 services:
   postgres:
     image: postgres:16
-    container_name: meld-production-api-postgres
+    container_name: openportio-production-api-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${PROD_API_DB_USER:-postgres}
       POSTGRES_PASSWORD: ${PROD_API_DB_PASSWORD:?set_in_env_file}
-      POSTGRES_DB: ${PROD_API_DB_NAME:-meld}
+      POSTGRES_DB: ${PROD_API_DB_NAME:-openportio}
     ports:
       - "55432:5432"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${PROD_API_DB_USER:-postgres} -d ${PROD_API_DB_NAME:-meld}",
+          "pg_isready -U ${PROD_API_DB_USER:-postgres} -d ${PROD_API_DB_NAME:-openportio}",
         ]
       interval: 5s
       timeout: 3s
       retries: 20
     volumes:
-      - meld-prod-api-pgdata:/var/lib/postgresql/data
+      - openportio-prod-api-pgdata:/var/lib/postgresql/data
 
 volumes:
-  meld-prod-api-pgdata:
+  openportio-prod-api-pgdata:

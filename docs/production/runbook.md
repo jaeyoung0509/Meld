@@ -6,7 +6,7 @@ This runbook provides first-response steps for common production incidents.
 
 Checklist:
 - Confirm process is running
-- Confirm bind address (`MELD_SERVER_ADDR`)
+- Confirm bind address (`OPENPORTIO_SERVER_ADDR`)
 - Check `/health` through service endpoint
 - Check ingress / load balancer routing
 
@@ -23,7 +23,7 @@ Symptoms:
 - gRPC `UNAUTHENTICATED`
 
 Checklist:
-- `MELD_AUTH_ENABLED=true`
+- `OPENPORTIO_AUTH_ENABLED=true`
 - JWT secret matches token signer
 - issuer/audience claims match runtime config
 
@@ -38,7 +38,7 @@ Checklist:
 - Run preflight locally in same environment
 
 ```bash
-MELD_PREFLIGHT_BOOT_SERVER=true ./scripts/prod_preflight.sh
+OPENPORTIO_PREFLIGHT_BOOT_SERVER=true ./scripts/prod_preflight.sh
 ```
 
 ## 4) Release Gate Before Rollout
@@ -46,11 +46,11 @@ MELD_PREFLIGHT_BOOT_SERVER=true ./scripts/prod_preflight.sh
 Execute:
 
 ```bash
-MELD_PREFLIGHT_SECURE=true \
-MELD_PREFLIGHT_BOOT_SERVER=true \
-MELD_AUTH_ENABLED=true \
-MELD_AUTH_JWT_SECRET=replace-me \
-MELD_CORS_ALLOW_ORIGINS=https://app.example.com \
+OPENPORTIO_PREFLIGHT_SECURE=true \
+OPENPORTIO_PREFLIGHT_BOOT_SERVER=true \
+OPENPORTIO_AUTH_ENABLED=true \
+OPENPORTIO_AUTH_JWT_SECRET=replace-me \
+OPENPORTIO_CORS_ALLOW_ORIGINS=https://app.example.com \
 ./scripts/prod_preflight.sh
 ```
 

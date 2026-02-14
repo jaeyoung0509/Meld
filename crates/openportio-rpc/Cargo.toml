@@ -1,0 +1,29 @@
+[package]
+name = "openportio-rpc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "gRPC proto bindings and contract generation tooling for Openportio."
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/openportio-rpc"
+readme = "README.md"
+keywords = ["openportio", "grpc", "tonic", "proto", "rust"]
+categories = ["web-programming", "network-programming", "asynchronous"]
+
+[[bin]]
+name = "grpc-docgen"
+path = "src/bin/grpc_docgen.rs"
+
+[dependencies]
+openportio-core = { path = "../openportio-core", version = "0.1.0" }
+prost.workspace = true
+prost-types = "0.13"
+protoc-bin-vendored.workspace = true
+serde_json.workspace = true
+tempfile = "3"
+tonic.workspace = true
+
+[build-dependencies]
+tonic-build.workspace = true
+protoc-bin-vendored.workspace = true

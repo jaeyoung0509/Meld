@@ -18,7 +18,7 @@ Provide human-readable and Swagger-compatible discovery docs for gRPC contracts 
 - Pros: rich ecosystem and mature tooling
 - Cons: extra toolchain management and onboarding cost
 
-## Chosen Strategy (Canonical For Meld)
+## Chosen Strategy (Canonical For Openportio)
 
 Use a descriptor-based generator that emits:
 - Markdown contract docs (`docs/generated/grpc-contracts.md`)
@@ -28,11 +28,11 @@ Why this choice:
 - Keeps `.proto` as source-of-truth
 - Parses protobuf descriptors instead of regex, making complex proto syntax safer to handle
 - Produces browsable docs without introducing an HTTP gateway runtime
-- Works with current Meld stack and can run in CI as a deterministic check
+- Works with current Openportio stack and can run in CI as a deterministic check
 
 ## Tooling
 
-- Generator: `scripts/generate_grpc_contract_docs.sh` (calls `cargo run -p meld-rpc --bin grpc-docgen`)
+- Generator: `scripts/generate_grpc_contract_docs.sh` (calls `cargo run -p openportio-rpc --bin grpc-docgen`)
 - Bundled generator flow: `scripts/generate_contracts_bundle.sh`
 - Drift check used in CI: `scripts/check_contracts_bundle.sh`
 

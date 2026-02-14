@@ -1,8 +1,8 @@
 [workspace]
 members = [
-  "crates/meld-core", "crates/meld-macros",
-  "crates/meld-rpc",
-  "crates/meld-server", "examples/meld-app",
+  "crates/openportio-core", "crates/openportio-macros",
+  "crates/openportio-rpc",
+  "crates/openportio-server", "examples/openportio-app",
   "examples/production-api",
   "examples/simple-server",
 ]
@@ -12,8 +12,8 @@ resolver = "2"
 edition = "2021"
 license = "MIT"
 version = "0.1.0"
-repository = "https://github.com/jaeyoung0509/Meld"
-homepage = "https://github.com/jaeyoung0509/Meld"
+repository = "https://github.com/jaeyoung0509/Openportio"
+homepage = "https://github.com/jaeyoung0509/Openportio"
 
 [workspace.dependencies]
 axum = { version = "0.7", features = ["macros", "http2", "ws"] }

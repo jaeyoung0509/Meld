@@ -29,11 +29,11 @@ curl -s http://127.0.0.1:4000/notes?limit=3
 ```bash
 grpcurl -plaintext 127.0.0.1:4000 list
 grpcurl -plaintext \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:4000 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 ## gRPC Auth Flow
@@ -41,10 +41,10 @@ grpcurl -plaintext \
 Restart server with auth enabled:
 
 ```bash
-MELD_AUTH_ENABLED=true \
-MELD_AUTH_JWT_SECRET=dev-secret \
-MELD_AUTH_ISSUER=https://issuer.local \
-MELD_AUTH_AUDIENCE=meld-api \
+OPENPORTIO_AUTH_ENABLED=true \
+OPENPORTIO_AUTH_JWT_SECRET=dev-secret \
+OPENPORTIO_AUTH_ISSUER=https://issuer.local \
+OPENPORTIO_AUTH_AUDIENCE=openportio-api \
 cargo run -p simple-server
 ```
 
@@ -52,11 +52,11 @@ Call without token (expected `UNAUTHENTICATED`):
 
 ```bash
 grpcurl -plaintext \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:4000 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 Generate a development token (dev-only helper):
@@ -65,7 +65,7 @@ Generate a development token (dev-only helper):
 TOKEN=$(python3 scripts/generate_dev_jwt.py \
   --secret dev-secret \
   --issuer https://issuer.local \
-  --audience meld-api)
+  --audience openportio-api)
 ```
 
 Call with token (expected success):
@@ -73,11 +73,11 @@ Call with token (expected success):
 ```bash
 grpcurl -plaintext \
   -H "authorization: Bearer ${TOKEN}" \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:4000 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 ## Troubleshooting
@@ -87,6 +87,6 @@ grpcurl -plaintext \
 - `python3: command not found`
   - Install Python 3 or generate token with another JWT tool.
 - `Code: Unauthenticated`
-  - Verify `MELD_AUTH_JWT_SECRET`, `MELD_AUTH_ISSUER`, `MELD_AUTH_AUDIENCE` match token inputs.
+  - Verify `OPENPORTIO_AUTH_JWT_SECRET`, `OPENPORTIO_AUTH_ISSUER`, `OPENPORTIO_AUTH_AUDIENCE` match token inputs.
 - `Failed to process proto source files` / import errors
-  - Run commands from repository root so `crates/meld-rpc/proto` and `service.proto` resolve correctly.
+  - Run commands from repository root so `crates/openportio-rpc/proto` and `service.proto` resolve correctly.

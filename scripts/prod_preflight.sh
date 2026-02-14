@@ -4,10 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-MELD_PREFLIGHT_BASE_URL="${MELD_PREFLIGHT_BASE_URL:-http://127.0.0.1:3000}"
-MELD_PREFLIGHT_BOOT_SERVER="${MELD_PREFLIGHT_BOOT_SERVER:-false}"
-MELD_PREFLIGHT_SECURE="${MELD_PREFLIGHT_SECURE:-false}"
-MELD_PREFLIGHT_WAIT_SECONDS="${MELD_PREFLIGHT_WAIT_SECONDS:-120}"
+OPENPORTIO_PREFLIGHT_BASE_URL="${OPENPORTIO_PREFLIGHT_BASE_URL:-http://127.0.0.1:3000}"
+OPENPORTIO_PREFLIGHT_BOOT_SERVER="${OPENPORTIO_PREFLIGHT_BOOT_SERVER:-false}"
+OPENPORTIO_PREFLIGHT_SECURE="${OPENPORTIO_PREFLIGHT_SECURE:-false}"
+OPENPORTIO_PREFLIGHT_WAIT_SECONDS="${OPENPORTIO_PREFLIGHT_WAIT_SECONDS:-120}"
 
 FAIL_COUNT=0
 WARN_COUNT=0
@@ -69,7 +69,7 @@ wait_for_server() {
 check_endpoint_status() {
   local path="$1"
   local expected="$2"
-  local url="${MELD_PREFLIGHT_BASE_URL}${path}"
+  local url="${OPENPORTIO_PREFLIGHT_BASE_URL}${path}"
   local body
   body="$(mktemp)"
   local code
@@ -88,7 +88,7 @@ check_endpoint_status() {
 check_endpoint_content_type() {
   local path="$1"
   local expected_prefix="$2"
-  local url="${MELD_PREFLIGHT_BASE_URL}${path}"
+  local url="${OPENPORTIO_PREFLIGHT_BASE_URL}${path}"
   local headers
   headers="$(mktemp)"
   curl -sS -D "$headers" -o /dev/null "$url" || true
@@ -103,69 +103,69 @@ check_endpoint_content_type() {
 }
 
 check_runtime_config() {
-  if is_truthy "$MELD_PREFLIGHT_SECURE"; then
-    if is_truthy "${MELD_AUTH_ENABLED:-false}"; then
-      ok "secure mode: MELD_AUTH_ENABLED=true"
+  if is_truthy "$OPENPORTIO_PREFLIGHT_SECURE"; then
+    if is_truthy "${OPENPORTIO_AUTH_ENABLED:-false}"; then
+      ok "secure mode: OPENPORTIO_AUTH_ENABLED=true"
     else
-      fail "secure mode requires MELD_AUTH_ENABLED=true"
+      fail "secure mode requires OPENPORTIO_AUTH_ENABLED=true"
     fi
 
-    if [[ -n "${MELD_AUTH_JWT_SECRET:-}" ]]; then
-      ok "secure mode: MELD_AUTH_JWT_SECRET is set"
+    if [[ -n "${OPENPORTIO_AUTH_JWT_SECRET:-}" ]]; then
+      ok "secure mode: OPENPORTIO_AUTH_JWT_SECRET is set"
     else
-      fail "secure mode requires MELD_AUTH_JWT_SECRET"
+      fail "secure mode requires OPENPORTIO_AUTH_JWT_SECRET"
     fi
 
-    if [[ -n "${MELD_AUTH_ISSUER:-}" ]]; then
-      ok "secure mode: MELD_AUTH_ISSUER is set"
+    if [[ -n "${OPENPORTIO_AUTH_ISSUER:-}" ]]; then
+      ok "secure mode: OPENPORTIO_AUTH_ISSUER is set"
     else
-      warn "secure mode: MELD_AUTH_ISSUER is not set (issuer validation disabled)"
+      warn "secure mode: OPENPORTIO_AUTH_ISSUER is not set (issuer validation disabled)"
     fi
 
-    if [[ -n "${MELD_AUTH_AUDIENCE:-}" ]]; then
-      ok "secure mode: MELD_AUTH_AUDIENCE is set"
+    if [[ -n "${OPENPORTIO_AUTH_AUDIENCE:-}" ]]; then
+      ok "secure mode: OPENPORTIO_AUTH_AUDIENCE is set"
     else
-      warn "secure mode: MELD_AUTH_AUDIENCE is not set (audience validation disabled)"
+      warn "secure mode: OPENPORTIO_AUTH_AUDIENCE is not set (audience validation disabled)"
     fi
   else
-    warn "secure mode is disabled (MELD_PREFLIGHT_SECURE=false)"
+    warn "secure mode is disabled (OPENPORTIO_PREFLIGHT_SECURE=false)"
   fi
 
-  local cors="${MELD_CORS_ALLOW_ORIGINS:-}"
+  local cors="${OPENPORTIO_CORS_ALLOW_ORIGINS:-}"
   if [[ -z "$cors" ]]; then
-    warn "MELD_CORS_ALLOW_ORIGINS is not set (cross-origin requests disabled by default)"
+    warn "OPENPORTIO_CORS_ALLOW_ORIGINS is not set (cross-origin requests disabled by default)"
   elif [[ "$cors" == "*" ]]; then
-    warn "MELD_CORS_ALLOW_ORIGINS='*' is unsafe for production"
+    warn "OPENPORTIO_CORS_ALLOW_ORIGINS='*' is unsafe for production"
   else
     ok "CORS allow list configured"
   fi
 
-  if [[ -z "${MELD_TIMEOUT_SECONDS:-}" ]]; then
-    warn "MELD_TIMEOUT_SECONDS not set (default 15s applies)"
+  if [[ -z "${OPENPORTIO_TIMEOUT_SECONDS:-}" ]]; then
+    warn "OPENPORTIO_TIMEOUT_SECONDS not set (default 15s applies)"
   else
-    ok "MELD_TIMEOUT_SECONDS is set"
+    ok "OPENPORTIO_TIMEOUT_SECONDS is set"
   fi
 
-  if [[ -z "${MELD_REQUEST_BODY_LIMIT_BYTES:-}" ]]; then
-    warn "MELD_REQUEST_BODY_LIMIT_BYTES not set (default 1048576 applies)"
+  if [[ -z "${OPENPORTIO_REQUEST_BODY_LIMIT_BYTES:-}" ]]; then
+    warn "OPENPORTIO_REQUEST_BODY_LIMIT_BYTES not set (default 1048576 applies)"
   else
-    ok "MELD_REQUEST_BODY_LIMIT_BYTES is set"
+    ok "OPENPORTIO_REQUEST_BODY_LIMIT_BYTES is set"
   fi
 }
 
 start_server_if_needed() {
-  if ! is_truthy "$MELD_PREFLIGHT_BOOT_SERVER"; then
+  if ! is_truthy "$OPENPORTIO_PREFLIGHT_BOOT_SERVER"; then
     return 0
   fi
 
   SERVER_LOG="$(mktemp)"
-  cargo run -p meld-server --bin meld-server >"$SERVER_LOG" 2>&1 &
+  cargo run -p openportio-server --bin openportio-server >"$SERVER_LOG" 2>&1 &
   SERVER_PID="$!"
 
-  if wait_for_server "$MELD_PREFLIGHT_BASE_URL" "$MELD_PREFLIGHT_WAIT_SECONDS"; then
-    ok "booted meld-server for endpoint checks ($MELD_PREFLIGHT_BASE_URL)"
+  if wait_for_server "$OPENPORTIO_PREFLIGHT_BASE_URL" "$OPENPORTIO_PREFLIGHT_WAIT_SECONDS"; then
+    ok "booted openportio-server for endpoint checks ($OPENPORTIO_PREFLIGHT_BASE_URL)"
   else
-    fail "failed to boot meld-server within ${MELD_PREFLIGHT_WAIT_SECONDS}s"
+    fail "failed to boot openportio-server within ${OPENPORTIO_PREFLIGHT_WAIT_SECONDS}s"
     if [[ -f "$SERVER_LOG" ]]; then
       printf '[INFO] server log tail:\n'
       tail -n 40 "$SERVER_LOG" || true

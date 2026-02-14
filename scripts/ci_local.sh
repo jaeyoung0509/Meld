@@ -19,28 +19,28 @@ cargo test --workspace
 echo "[5/10] cargo test -p production-api -- --nocapture"
 cargo test -p production-api -- --nocapture
 
-echo "[6/10] cargo test -p meld-server --test multiplexing -- --nocapture"
-cargo test -p meld-server --test multiplexing -- --nocapture
+echo "[6/10] cargo test -p openportio-server --test multiplexing -- --nocapture"
+cargo test -p openportio-server --test multiplexing -- --nocapture
 
 echo "[7/10] scripts/check_contracts_bundle.sh"
 ./scripts/check_contracts_bundle.sh
 
-echo "[8/10] cargo test -p meld-server openapi_json_is_available -- --nocapture"
-cargo test -p meld-server openapi_json_is_available -- --nocapture
+echo "[8/10] cargo test -p openportio-server openapi_json_is_available -- --nocapture"
+cargo test -p openportio-server openapi_json_is_available -- --nocapture
 
 echo "[9/10] scripts/prod_preflight.sh"
-MELD_PREFLIGHT_SECURE=true \
-MELD_PREFLIGHT_BOOT_SERVER=true \
-MELD_PREFLIGHT_WAIT_SECONDS=120 \
-MELD_PREFLIGHT_BASE_URL=http://127.0.0.1:3000 \
-MELD_AUTH_ENABLED=true \
-MELD_AUTH_JWT_SECRET=local-dev-secret \
-MELD_AUTH_ISSUER=https://issuer.local \
-MELD_AUTH_AUDIENCE=meld-api \
-MELD_CORS_ALLOW_ORIGINS=https://app.example.com \
-MELD_TIMEOUT_SECONDS=15 \
-MELD_REQUEST_BODY_LIMIT_BYTES=1048576 \
-MELD_MAX_IN_FLIGHT_REQUESTS=1024 \
+OPENPORTIO_PREFLIGHT_SECURE=true \
+OPENPORTIO_PREFLIGHT_BOOT_SERVER=true \
+OPENPORTIO_PREFLIGHT_WAIT_SECONDS=120 \
+OPENPORTIO_PREFLIGHT_BASE_URL=http://127.0.0.1:3000 \
+OPENPORTIO_AUTH_ENABLED=true \
+OPENPORTIO_AUTH_JWT_SECRET=local-dev-secret \
+OPENPORTIO_AUTH_ISSUER=https://issuer.local \
+OPENPORTIO_AUTH_AUDIENCE=openportio-api \
+OPENPORTIO_CORS_ALLOW_ORIGINS=https://app.example.com \
+OPENPORTIO_TIMEOUT_SECONDS=15 \
+OPENPORTIO_REQUEST_BODY_LIMIT_BYTES=1048576 \
+OPENPORTIO_MAX_IN_FLIGHT_REQUESTS=1024 \
 ./scripts/prod_preflight.sh
 
 echo "[10/10] scripts/release_dry_run.sh"

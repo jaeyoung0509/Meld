@@ -1,17 +1,17 @@
 # FastAPI-Like Builder API
 
-Meld exposes a fluent server builder for a compact startup flow.
+Openportio exposes a fluent server builder for a compact startup flow.
 
 ## Quick Start
 
 ```rust
 use std::net::SocketAddr;
 
-use meld_server::prelude::*;
+use openportio_server::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    MeldServer::new()
+    OpenportioServer::new()
         .with_addr(SocketAddr::from(([127, 0, 0, 1], 3000)))
         .run()
         .await?;
@@ -19,8 +19,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-`meld_server::prelude::*` includes:
-- `MeldServer`
+`openportio_server::prelude::*` includes:
+- `OpenportioServer`
 - `route` and `dto` macros
 - common validation extractors (`ValidatedJson`, `ValidatedQuery`, `ValidatedPath`, `ValidatedParts`)
 - `Depends` DI extractor
@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## DTO And Dependency Injection Pattern
 
-You can model FastAPI-like DTOs with `#[meld_server::dto]` and inject shared dependencies using `State<Arc<AppState>>`.
+You can model FastAPI-like DTOs with `#[openportio_server::dto]` and inject shared dependencies using `State<Arc<AppState>>`.
 
 `dto` requirements:
 - `utoipa` must be available in the crate dependencies (for `ToSchema` derive expansion)
@@ -46,25 +46,25 @@ You can model FastAPI-like DTOs with `#[meld_server::dto]` and inject shared dep
 ```rust
 use std::sync::Arc;
 
-use meld_core::AppState;
+use openportio_core::AppState;
 use axum::{
     extract::{Path, Query, State},
     Json,
 };
 use serde::Serialize;
 
-#[meld_server::dto]
+#[openportio_server::dto]
 struct NotePath {
     id: String,
 }
 
-#[meld_server::dto]
+#[openportio_server::dto]
 struct NoteQuery {
     q: Option<String>,
     limit: Option<u32>,
 }
 
-#[meld_server::dto]
+#[openportio_server::dto]
 struct CreateNoteBody {
     title: String,
 }
@@ -88,17 +88,17 @@ See `/examples/simple-server/src/main.rs` for a runnable end-to-end example usin
 
 ## Validation And Error DTO Pattern
 
-Meld now includes reusable REST validation helpers:
+Openportio now includes reusable REST validation helpers:
 
-- `meld_server::api::ValidatedJson<T>`
-- `meld_server::api::ValidatedQuery<T>`
-- `meld_server::api::ApiErrorResponse`
+- `openportio_server::api::ValidatedJson<T>`
+- `openportio_server::api::ValidatedQuery<T>`
+- `openportio_server::api::ApiErrorResponse`
 
 Typical usage:
 
 ```rust
-use meld_server::api::{ApiError, ValidatedJson};
-#[meld_server::dto]
+use openportio_server::api::{ApiError, ValidatedJson};
+#[openportio_server::dto]
 struct CreateNoteBody {
     #[validate(length(min = 2, max = 120))]
     title: String,
@@ -123,7 +123,7 @@ OpenAPI wiring:
 
 ## Auto-Validate Route Macro (FastAPI-Like DX)
 
-For a more FastAPI-like handler style, use `#[meld_server::route(..., auto_validate)]`.
+For a more FastAPI-like handler style, use `#[openportio_server::route(..., auto_validate)]`.
 
 With `auto_validate`, handler arguments are rewritten at compile time:
 - `Json<T>` -> `ValidatedJson<T>`
@@ -133,10 +133,10 @@ With `auto_validate`, handler arguments are rewritten at compile time:
 Example:
 
 ```rust
-use meld_server::api::ApiError;
+use openportio_server::api::ApiError;
 use axum::Json;
 
-#[meld_server::route(post, "/notes", auto_validate)]
+#[openportio_server::route(post, "/notes", auto_validate)]
 async fn create_note(Json(body): Json<CreateNoteBody>) -> Result<Json<String>, ApiError> {
     Ok(Json(body.title))
 }
@@ -149,11 +149,11 @@ that implements `Validate`.
 
 Macro portability:
 - `#[route(...)]` expansion is dependency-rename safe.
-- Example compile coverage exists under `examples/meld-app`.
+- Example compile coverage exists under `examples/openportio-app`.
 
 ## SSE Endpoint Pattern
 
-Meld supports Server-Sent Events (SSE) for lightweight one-way real-time updates.
+Openportio supports Server-Sent Events (SSE) for lightweight one-way real-time updates.
 
 ```rust
 use std::{convert::Infallible, time::Duration};
@@ -187,7 +187,7 @@ Client reconnect guidance:
 
 ## WebSocket Endpoint Pattern
 
-Meld supports WebSocket upgrade handlers for bidirectional realtime flows.
+Openportio supports WebSocket upgrade handlers for bidirectional realtime flows.
 
 ```rust
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -204,19 +204,19 @@ async fn handle_ws(mut socket: WebSocket) {
 }
 ```
 
-Server defaults in `meld-server`:
-- max text frame bytes: `MELD_WS_MAX_TEXT_BYTES` (default `4096`)
-- idle timeout seconds: `MELD_WS_IDLE_TIMEOUT_SECS` (default `45`)
+Server defaults in `openportio-server`:
+- max text frame bytes: `OPENPORTIO_WS_MAX_TEXT_BYTES` (default `4096`)
+- idle timeout seconds: `OPENPORTIO_WS_IDLE_TIMEOUT_SECS` (default `45`)
 
 ## OAuth2/OIDC JWT Auth Pattern
 
-Meld includes shared JWT claim validation used by both REST and gRPC layers.
+Openportio includes shared JWT claim validation used by both REST and gRPC layers.
 
 Environment configuration:
-- `MELD_AUTH_ENABLED=true`
-- `MELD_AUTH_JWT_SECRET=<hmac-secret>`
-- optional: `MELD_AUTH_ISSUER=<issuer>`
-- optional: `MELD_AUTH_AUDIENCE=<audience>`
+- `OPENPORTIO_AUTH_ENABLED=true`
+- `OPENPORTIO_AUTH_JWT_SECRET=<hmac-secret>`
+- optional: `OPENPORTIO_AUTH_ISSUER=<issuer>`
+- optional: `OPENPORTIO_AUTH_AUDIENCE=<audience>`
 
 When enabled:
 - REST protected route example: `GET /protected/whoami` (Bearer token required)
@@ -227,14 +227,14 @@ When disabled:
 
 ## Depends-Like Extractor Pattern
 
-For FastAPI `Depends(...)` style injection, use `meld_server::di::Depends<T>`.
+For FastAPI `Depends(...)` style injection, use `openportio_server::di::Depends<T>`.
 `Depends<T>` resolves dependencies from state (`FromRef`) with request-scoped caching.
 
 ```rust
 use std::sync::Arc;
 
-use meld_core::AppState;
-use meld_server::di::Depends;
+use openportio_core::AppState;
+use openportio_server::di::Depends;
 use axum::extract::FromRef;
 
 #[derive(Clone)]
@@ -256,15 +256,15 @@ async fn handler(Depends(info): Depends<ServiceInfo>) -> String {
 ```
 
 Test override helper:
-- `meld_server::di::with_dependency_override(router, value)`
-- `meld_server::di::with_dependency(router, value)`
-- `meld_server::di::with_dependency_overrides(router, overrides)`
-- `MeldServer::with_dependency(value)`
+- `openportio_server::di::with_dependency_override(router, value)`
+- `openportio_server::di::with_dependency(router, value)`
+- `openportio_server::di::with_dependency_overrides(router, overrides)`
+- `OpenportioServer::with_dependency(value)`
 
 ## Notes
 
-- Default `MeldServer::new()` enables both REST and gRPC on a single listener.
-- Default address uses `MELD_SERVER_ADDR` if set, otherwise `127.0.0.1:3000`.
+- Default `OpenportioServer::new()` enables both REST and gRPC on a single listener.
+- Default address uses `OPENPORTIO_SERVER_ADDR` if set, otherwise `127.0.0.1:3000`.
 
 ## gRPC Quickstart (No-Auth + Auth)
 
@@ -275,7 +275,7 @@ Prerequisites:
 Start server (default no-auth):
 
 ```bash
-cargo run -p meld-server
+cargo run -p openportio-server
 ```
 
 No-auth smoke tests:
@@ -283,32 +283,32 @@ No-auth smoke tests:
 ```bash
 grpcurl -plaintext 127.0.0.1:3000 list
 grpcurl -plaintext \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:3000 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 Enable auth (restart server):
 
 ```bash
-MELD_AUTH_ENABLED=true \
-MELD_AUTH_JWT_SECRET=dev-secret \
-MELD_AUTH_ISSUER=https://issuer.local \
-MELD_AUTH_AUDIENCE=meld-api \
-cargo run -p meld-server
+OPENPORTIO_AUTH_ENABLED=true \
+OPENPORTIO_AUTH_JWT_SECRET=dev-secret \
+OPENPORTIO_AUTH_ISSUER=https://issuer.local \
+OPENPORTIO_AUTH_AUDIENCE=openportio-api \
+cargo run -p openportio-server
 ```
 
 Expected failure without token:
 
 ```bash
 grpcurl -plaintext \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:3000 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 Expected outcome:
@@ -321,7 +321,7 @@ Generate a development token (dev-only helper):
 TOKEN=$(python3 scripts/generate_dev_jwt.py \
   --secret dev-secret \
   --issuer https://issuer.local \
-  --audience meld-api)
+  --audience openportio-api)
 ```
 
 Expected success with token:
@@ -329,14 +329,14 @@ Expected success with token:
 ```bash
 grpcurl -plaintext \
   -H "authorization: Bearer ${TOKEN}" \
-  -import-path crates/meld-rpc/proto \
+  -import-path crates/openportio-rpc/proto \
   -proto service.proto \
   -d '{"name":"Rust"}' \
   127.0.0.1:3000 \
-  meld.v1.Greeter/SayHello
+  openportio.v1.Greeter/SayHello
 ```
 
 Common auth mismatch outcomes:
-- wrong `--secret` / `MELD_AUTH_JWT_SECRET`: `UNAUTHENTICATED`
-- wrong `--issuer` / `MELD_AUTH_ISSUER`: `UNAUTHENTICATED`
-- wrong `--audience` / `MELD_AUTH_AUDIENCE`: `UNAUTHENTICATED`
+- wrong `--secret` / `OPENPORTIO_AUTH_JWT_SECRET`: `UNAUTHENTICATED`
+- wrong `--issuer` / `OPENPORTIO_AUTH_ISSUER`: `UNAUTHENTICATED`
+- wrong `--audience` / `OPENPORTIO_AUTH_AUDIENCE`: `UNAUTHENTICATED`

@@ -11,10 +11,14 @@ The format is inspired by Keep a Changelog, and versioning currently follows `0.
 - Production preflight gate and production operations docs
 - Unified REST+gRPC contracts bundle generation and validation
 
+### Changed
+- Rebranded workspace and crates from `meld-*` to `openportio-*`
+- Switched primary runtime env prefix from `MELD_*` to `OPENPORTIO_*` with compatibility aliases retained
+
 ## [0.1.0-rc.1] - TBD
 
 ### Added
-- Initial public release candidate for Meld core/runtime crates
+- Initial public release candidate for Openportio core/runtime crates
 - Single-port REST + gRPC serving baseline
 - FastAPI-like DTO/validation/DI ergonomics
 - REST OpenAPI and gRPC contract discovery artifacts
