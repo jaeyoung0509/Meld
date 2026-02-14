@@ -17,6 +17,7 @@ pub struct OpenportioServer {
     state: Arc<AppState>,
     addr: SocketAddr,
     rest_router: Option<Router>,
+    raw_routers: Vec<Router>,
     grpc_routes: Option<Routes>,
     dependency_overrides: di::DependencyOverrides,
     middleware_config: middleware::MiddlewareConfig,
@@ -33,6 +34,7 @@ impl OpenportioServer {
             state,
             addr: load_addr_from_env().unwrap_or(SocketAddr::from(([127, 0, 0, 1], 3000))),
             rest_router: None,
+            raw_routers: Vec::new(),
             dependency_overrides: di::DependencyOverrides::default(),
             middleware_config: middleware::MiddlewareConfig::from_env(),
             middleware_customizers: Vec::new(),
@@ -53,6 +55,11 @@ impl OpenportioServer {
 
     pub fn with_rest_router(mut self, router: Router) -> Self {
         self.rest_router = Some(router);
+        self
+    }
+
+    pub fn merge_raw_router(mut self, router: Router) -> Self {
+        self.raw_routers.push(router);
         self
     }
 
@@ -91,6 +98,24 @@ impl OpenportioServer {
         self
     }
 
+    pub fn configure_tonic<F>(self, configure: F) -> Self
+    where
+        F: FnOnce(Routes) -> Routes,
+    {
+        self.configure_tonic_routes(configure)
+    }
+
+    pub fn configure_tonic_routes<F>(mut self, configure: F) -> Self
+    where
+        F: FnOnce(Routes) -> Routes,
+    {
+        self.grpc_routes = self
+            .grpc_routes
+            .take()
+            .map(|routes| configure(routes).prepare());
+        self
+    }
+
     pub fn with_middleware_config(mut self, config: middleware::MiddlewareConfig) -> Self {
         self.middleware_config = config;
         self
@@ -125,6 +150,11 @@ impl OpenportioServer {
             .rest_router
             .clone()
             .unwrap_or_else(|| build_router(self.state.clone()));
+        let rest = self
+            .raw_routers
+            .iter()
+            .cloned()
+            .fold(rest, |acc, router| acc.merge(router));
         let merged = match &self.grpc_routes {
             Some(routes) => rest.merge(routes.clone().into_axum_router()),
             None => rest,
@@ -198,7 +228,11 @@ mod tests {
         http::{Request, StatusCode},
         routing::get,
     };
-    use std::sync::{LazyLock, Mutex};
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, LazyLock, Mutex,
+    };
+    use tonic::service::Routes;
     use tower::util::ServiceExt;
 
     static ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
@@ -232,6 +266,77 @@ mod tests {
             .await
             .expect("ping request should succeed");
         assert_eq!(ping_response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn builder_supports_raw_router_merge() {
+        let raw_router = Router::new().route("/metrics", get(|| async { "metrics-ok" }));
+        let app = OpenportioServer::new()
+            .without_grpc()
+            .merge_raw_router(raw_router)
+            .build_app();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/metrics")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("metrics request should succeed");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("response body");
+        assert_eq!(
+            String::from_utf8(body.to_vec()).expect("utf8"),
+            "metrics-ok"
+        );
+    }
+
+    #[tokio::test]
+    async fn builder_supports_tonic_routes_configuration_hook() {
+        let app = OpenportioServer::new()
+            .configure_tonic(|routes| {
+                let router = routes
+                    .into_axum_router()
+                    .route("/grpc-hook", get(|| async { "grpc-hook-ok" }));
+                Routes::from(router)
+            })
+            .build_app();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/grpc-hook")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .expect("grpc hook request should succeed");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("response body");
+        assert_eq!(
+            String::from_utf8(body.to_vec()).expect("utf8"),
+            "grpc-hook-ok"
+        );
+    }
+
+    #[test]
+    fn configure_tonic_is_noop_when_grpc_is_disabled() {
+        let called = Arc::new(AtomicBool::new(false));
+        let marker = Arc::clone(&called);
+        let _ = OpenportioServer::new()
+            .without_grpc()
+            .configure_tonic(move |routes| {
+                marker.store(true, Ordering::SeqCst);
+                routes
+            })
+            .build_app();
+        assert!(!called.load(Ordering::SeqCst));
     }
 
     #[derive(Clone)]
