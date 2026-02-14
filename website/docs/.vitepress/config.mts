@@ -1,6 +1,11 @@
 import { defineConfig } from 'vitepress';
 
 const base = process.env.VITEPRESS_BASE || '/';
+const siteOrigin = (process.env.VITEPRESS_SITE_ORIGIN || 'https://jaeyoung0509.github.io').replace(
+  /\/$/,
+  ''
+);
+const basePath = base === '/' ? '' : base.replace(/\/$/, '');
 
 export default defineConfig({
   base,
@@ -9,6 +14,9 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
   lang: 'en-US',
+  sitemap: {
+    hostname: `${siteOrigin}${basePath}`
+  },
   themeConfig: {
     logo: '/openportio-logo.svg',
     siteTitle: 'Openportio Docs',

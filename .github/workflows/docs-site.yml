@@ -46,11 +46,35 @@ jobs:
         working-directory: website
         run: npm ci
 
+      - name: Check docs links
+        working-directory: website
+        run: npm run docs:check-links
+
       - name: Build docs site
         working-directory: website
         env:
           VITEPRESS_BASE: /Openportio/
+          VITEPRESS_SITE_ORIGIN: https://jaeyoung0509.github.io
         run: npm run docs:build
+
+      - name: Verify sitemap and robots outputs
+        run: |
+          set -euo pipefail
+          test -f website/docs/.vitepress/dist/sitemap.xml || {
+            echo "::error::missing website/docs/.vitepress/dist/sitemap.xml";
+            exit 1;
+          }
+          test -f website/docs/.vitepress/dist/robots.txt || {
+            echo "::error::missing website/docs/.vitepress/dist/robots.txt";
+            exit 1;
+          }
+          expected_sitemap="https://jaeyoung0509.github.io/Openportio/sitemap.xml"
+          if ! grep -q "${expected_sitemap}" website/docs/.vitepress/dist/robots.txt; then
+            echo "::error::robots.txt does not include expected sitemap URL: ${expected_sitemap}"
+            echo "robots.txt content:"
+            cat website/docs/.vitepress/dist/robots.txt
+            exit 1
+          fi
 
       - name: Upload docs artifact (PR)
         if: github.event_name == 'pull_request'
@@ -78,6 +102,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Post-deploy smoke check
+        env:
+          DOCS_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          ./scripts/check_docs_site_smoke.sh "${DOCS_URL}" "Openportio"
