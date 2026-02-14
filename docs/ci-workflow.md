@@ -31,6 +31,12 @@ This project uses focused CI jobs so failures are clearly scoped:
 8. `Release Dry Run`
 - `./scripts/release_dry_run.sh`
 
+9. `Perf Regression Gate` (manual workflow)
+- workflow: `.github/workflows/perf.yml`
+- trigger: `workflow_dispatch`
+- runs REST (`k6`) + gRPC (`ghz`) perf smoke with threshold enforcement
+- uploads artifact: `perf-report`
+
 ## Local Equivalent
 
 Run:
@@ -48,3 +54,11 @@ For dedicated nextest + coverage quality gates, run:
 ```
 
 See `docs/testing-toolchain.md` for installation and outputs.
+
+For local perf regression gate, run:
+
+```bash
+./scripts/perf_gate.sh
+```
+
+See `docs/performance-gates.md` for thresholds and tuning guidance.

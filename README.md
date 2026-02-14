@@ -227,6 +227,15 @@ Extended testing quality gate (nextest + coverage):
 
 See `docs/testing-toolchain.md` for setup and coverage artifacts.
 
+Performance regression smoke gate (REST + gRPC):
+
+```bash
+./scripts/perf_gate.sh
+```
+
+Manual CI workflow is available at `.github/workflows/perf.yml`.
+See `docs/performance-gates.md` for thresholds, artifacts, and tuning.
+
 ## Production Readiness Docs
 
 - `docs/production/deployment.md`
