@@ -37,6 +37,10 @@ This project uses focused CI jobs so failures are clearly scoped:
 - runs REST (`k6`) + gRPC (`ghz`) perf smoke with threshold enforcement
 - uploads artifact: `perf-report`
 
+10. `Docs Site`
+- workflow: `.github/workflows/docs-site.yml`
+- validates docs links, builds VitePress, verifies `sitemap.xml` + `robots.txt`, deploys GitHub Pages, then runs post-deploy smoke check
+
 ## Local Equivalent
 
 Run:
@@ -62,3 +66,9 @@ For local perf regression gate, run:
 ```
 
 See `docs/performance-gates.md` for thresholds and tuning guidance.
+
+For docs-site failure triage and rollback/retry, see:
+
+```bash
+docs/release/docs-site-runbook.md
+```

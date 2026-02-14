@@ -17,11 +17,19 @@ cd website
 npm run docs:build
 ```
 
+## Validate Links
+
+```bash
+cd website
+npm run docs:check-links
+```
+
 ## GitHub Pages Deploy
 
 CI builds and deploys this site via GitHub Actions on pushes to `develop`/`main`.
-Production base path is set with:
+Production env defaults:
 
 ```bash
 VITEPRESS_BASE=/Openportio/
+VITEPRESS_SITE_ORIGIN=https://jaeyoung0509.github.io
 ```
